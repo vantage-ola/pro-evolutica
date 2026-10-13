@@ -1,4 +1,4 @@
-# Week 1 verification
+# Tool verification
 
 Date: 13 October 2026, Africa/Lagos. Python 3.11.9 on macOS ARM64.
 
@@ -10,7 +10,7 @@ Command:
 .venv/bin/python -m pytest -q
 ```
 
-Exact final output, also saved in [week1-tests.txt](week1-tests.txt):
+Exact final output, also saved in [tools-tests.txt](tools-tests.txt):
 
 ```text
 ............................................                             [100%]

@@ -2,7 +2,7 @@
 
 Updated: 13 October 2026 (Africa/Lagos).
 
-**Week 1 software foundations work. Milestone 1 remains open until the phone's
+**The inspection tools are implemented and tested. Milestone 1 remains open until the phone's
 first gameplay result is recorded, including a crash if that is the outcome.**
 No later milestone implementation has started.
 
@@ -26,7 +26,7 @@ even though the broader plan also lists it under Milestone 3.
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
 - **44 tests pass** on Python 3.11.9. Commands and results are in
-  [verification/week1.md](verification/week1.md). Usage is in [TOOLS.md](TOOLS.md).
+  [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
 - A blank phone benchmark template is ready in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md).
 - Local Verity proof chains link both tools to their synthetic tests and saved

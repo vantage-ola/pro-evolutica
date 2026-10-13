@@ -3,7 +3,7 @@ android ports // reverse engineering of my favourite PES games growing up.
 
 **A milestone-driven engineering project to investigate, run, and prototype Android support for classic Konami football games.**
 
-Week 1 tool usage: [docs/TOOLS.md](docs/TOOLS.md). Verified work and pending device
+Tool usage: [docs/TOOLS.md](docs/TOOLS.md). Verified work and pending device
 tests: [docs/STATUS.md](docs/STATUS.md).
 
 ## Mission
