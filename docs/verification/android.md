@@ -67,13 +67,51 @@ which matches Gradle's [official checksum](https://gradle.org/release-checksums/
 The distribution ZIP checksum is pinned in the wrapper properties. Configuration
 does not run the CMake compiler, resolve the missing SDL AAR or build an APK.
 
-## Pending checks
+## APK build and inspection
 
-- The first offline APK build stopped at CMake configuration because
-  `com.google.prefab:cli:2.1.0` was absent from the Gradle cache. SDK XML version
-  warnings also appeared; the reported task failure was dependency resolution.
-  A build without `--offline` is required to fetch the missing build dependencies.
-  Full APK packaging and native rendering remain unverified.
+The first offline build lacked `com.google.prefab:cli:2.1.0`. The subsequent
+build with dependency downloads enabled completed:
+
+```bash
+./android/gradlew -p android --no-daemon :app:assembleDebug
+```
+
+Reported build output:
+
+```text
+BUILD SUCCESSFUL in 17s
+36 actionable tasks: 10 executed, 26 up-to-date
+```
+
+SDK XML version/package-element warnings appeared, but did not prevent this
+build. The produced APK was independently inspected with the installed tools:
+
+```bash
+"$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose \
+  android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging \
+  android/app/build/outputs/apk/debug/app-debug.apk
+shasum -a 256 android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+All returned 0. Signature schemes v1 and v2 verify; apksigner also prints a
+warning about the Gradle metadata entry's v1 signature coverage. The package is
+`com.proevolutica.viewer`, launch activity `.ViewerActivity`, minimum API 23,
+target API 35, required OpenGL ES 3.0 and native ABI `arm64-v8a` only.
+
+APK size: 3,779,654 bytes. SHA-256:
+`5fd5ec8292f90d1f4850b18562b54730fa1b6ada45ca618d1f03fee04bdaf96e`.
+This identifies the inspected debug build; later builds may have different hashes.
+
+A separate ZIP/ELF check passed every entry's CRC and found exactly three native
+libraries: `libmain.so`, `libSDL3.so` and `libc++_shared.so`, all ELF64,
+little-endian AArch64. There are no packaged `assets/` files. `llvm-readelf`
+confirms `libmain.so` exports `SDL_main` and depends on SDL3, GLESv3 and the C++
+runtime. The inspection report remains under ignored
+`private/native-checks/apk-check.json`.
+
+## Pending device checks
+
 - `adb devices -l` returned 0 with an empty device list. No native app has been
   installed or launched on the Note20.
 - Triangle appearance, shader compilation, touch/controller input, rotation and

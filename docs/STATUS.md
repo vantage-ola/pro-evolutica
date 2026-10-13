@@ -21,8 +21,9 @@ for the next development direction.
   DDS extraction, mip metadata and a PNG preview of the largest level.
 - Native triangle renderer compiles without warnings against the installed NDK;
   its object file is ELF64/AArch64. The SDL3 Android app source and build files
-  are prepared, with touch/gamepad input handlers. Full APK and device checks
-  remain pending; see [ANDROID.md](ANDROID.md) and
+  are prepared, with touch/gamepad input handlers. The debug APK now builds;
+  signature verification passes and its three native libraries are AArch64 only.
+  Device checks remain pending; see [ANDROID.md](ANDROID.md) and
   [verification/android.md](verification/android.md).
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
@@ -91,9 +92,8 @@ sample for a viewer. Its in-game use and all mesh formats remain unverified.
 
 ## Next three tasks
 
-1. Populate the missing Gradle dependency cache (Prefab CLI 2.1.0), then
-   compile/link and inspect the ARM64 triangle APK. SDL3 and CMake are present.
-2. Connect the Note20 and verify the triangle, touch/controller input and
+1. Connect the Note20 and install/launch the inspected triangle APK over ADB.
+2. Verify the triangle, touch/controller input and
    background/resume behaviour; keep a screenshot and logs.
 3. After that check passes, add a textured cube with an original texture, then
    support the locally supplied PNG without packaging game assets.
