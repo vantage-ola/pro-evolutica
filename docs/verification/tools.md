@@ -13,9 +13,10 @@ Command:
 Exact final output, also saved in [tools-tests.txt](tools-tests.txt):
 
 ```text
-........................................................................ [ 67%]
-..................................                                       [100%]
-106 passed in 0.90s
+........................................................................ [ 47%]
+........................................................................ [ 94%]
+........                                                                 [100%]
+152 passed in 1.13s
 ```
 
 The test suite generates two-section PE fixtures in pytest temporary directories.
@@ -45,6 +46,14 @@ A false-size fixture expands to 2 MiB, but decoding rejects it with less than
 512 KiB of traced Python allocations. File tests check overwrite/symlink refusal,
 non-blocking FIFO rejection, destination validation, detection of input mutation,
 and absence of decoded outputs after format errors.
+
+The 46 texture tests generate original bundle, WE00 and DDS fixtures. They check
+selection and exact DDS bytes, all mip sizes, malformed offsets/counts/headers,
+dimension limits, unsupported formats/cube maps, zero padding and file/CLI
+errors. Golden DXT1 blocks verify four-colour interpolation, one-bit alpha,
+selector order and clipping for dimensions smaller than or not divisible by four.
+PNG tests verify dimensions, chunk CRCs and decoded RGBA scanlines. No real game
+texture is required by the suite.
 
 ```bash
 .venv/bin/python -m pip check
@@ -120,12 +129,42 @@ The CLI returned 0 and produced 28,272 bytes. `shasum` agreed with
 `git check-ignore` confirmed the decoded file and report remain excluded.
 The runtime used Python's bundled zlib 1.2.12; no new dependency was installed.
 
+## Real texture extraction and preview
+
+The existing AFS and WESYS CLIs extracted `dt08.img` entry 2 and decoded it into
+a 43,888-byte bundle. The texture CLI then selected bundle index 0:
+
+```bash
+.venv/bin/python tools/pes_texture.py \
+  --input private/extracted/dt08-entry-00002-decoded.bin \
+  --output private/extracted/dt08-entry-00002.dds \
+  --png private/extracted/dt08-entry-00002.png \
+  --json private/reports/dt08-entry-00002-texture.json
+shasum -a 256 private/extracted/dt08-entry-00002.dds \
+  private/extracted/dt08-entry-00002.png
+/usr/bin/sips -s format png private/extracted/dt08-entry-00002.dds \
+  --out private/extracted/dt08-entry-00002-reference.png
+```
+
+All commands returned 0. The DDS is 256 × 256 DXT1, nine mip levels, 43,832 bytes;
+it exactly matches the source range at offset 48. The PNG is 17,631 bytes.
+`shasum` agrees with both hashes in [the research record](../research/pes2013.md).
+
+The generated PNG was visually inspected. An independent macOS DDS conversion
+also succeeded. After checking PNG CRCs and reversing their scanline filters,
+RGBA comparison found zero alpha differences and a maximum RGB difference of
+1/255; 15,547 of 262,144 channels differ. This is a close pixel comparison, not
+an exact match to the independent decoder. The DDS extraction itself is exact.
+The reference check is separate from pytest and is specific to this local sample.
+`git check-ignore` confirms the DDS, PNG and report are excluded from Git.
+
 ## Review and limits
 
 Reports preserve parser warnings; an import list with warnings requires further
-review. These checks verify the diagnostics, AFS extraction and the observed
-WESYS/zlib wrapper on macOS ARM64. They do not verify contained script bytecode,
-mesh/texture formats, REA/Ghidra, native rendering or device connectivity.
+review. These checks verify diagnostics, AFS extraction, the observed WESYS/zlib
+wrapper and the supported flat DXT1 texture workflow on macOS ARM64. They do not
+verify script bytecode, other texture formats, meshes, REA/Ghidra, native rendering
+or device connectivity.
 The manual Winlator report is recorded separately in
 [the phone baseline](../benchmarks/pes2013-baseline.md); sustained performance
 has not been measured.

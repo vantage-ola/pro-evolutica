@@ -16,7 +16,8 @@ dependencies and makes no assumptions about what an entry represents.
 
 The WESYS decoder now passes synthetic tests and decodes all ten non-empty
 `dt10.img` entries. Their markers indicate likely compiled scripts, with VM
-compatibility and behaviour still unverified. Next, select a texture or mesh from
-another container and validate its format. Android rendering will use that
-verified asset or an original test asset. Successful decompression alone does
-not establish support for models, textures or the proprietary engine.
+compatibility and behaviour still unverified. The texture reader now extracts a
+verified 256 × 256 DXT1 DDS from `dt08.img` entry 2 and produces a checked PNG
+preview. Next, build the smallest original ARM64 rendering application with an
+original test texture, then load this locally supplied PNG. Keep the game asset
+outside the APK and Git. Meshes and the proprietary engine remain unsupported.

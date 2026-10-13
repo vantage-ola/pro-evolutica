@@ -166,3 +166,43 @@ Reports contain input and decoded SHA-256 hashes, header bytes, compressed and
 decoded sizes, zero-padding length and the first 32 decoded bytes in hex. The
 decoder does not classify, interpret or execute the contents. It uses Python's
 standard-library `zlib`; no new package is required.
+
+## Extract a verified DXT1 texture
+
+The inspected `dt08.img` AFS entry 2 decodes into a bundle containing one WE00
+texture. AFS entry indices and decoded bundle indices are separate: the texture
+below is **AFS entry 2, bundle index 0**.
+
+```bash
+.venv/bin/python tools/afs_inspect.py \
+  --input "$GAME_ROOT/img/dt08.img" --entry 2 \
+  --output private/extracted/dt08-entry-00002.bin
+.venv/bin/python tools/wesys_unpack.py \
+  --input private/extracted/dt08-entry-00002.bin \
+  --output private/extracted/dt08-entry-00002-decoded.bin
+.venv/bin/python tools/pes_texture.py \
+  --input private/extracted/dt08-entry-00002-decoded.bin --index 0 \
+  --output private/extracted/dt08-entry-00002.dds \
+  --png private/extracted/dt08-entry-00002.png \
+  --json private/reports/dt08-entry-00002-texture.json
+```
+
+Create the ignored output directories first. Use new names if outputs already
+exist. Omit `--output` and `--png` for metadata only; omit `--json` for stdout.
+The reader preserves the DDS header and all mip levels byte-for-byte. PNG output
+decodes only the largest level, with one-bit alpha transparency when present.
+Reports include container/entry metadata, the opaque WE00 header, texture
+dimensions/format, each mip's offset/size, and input/DDS/PNG hashes.
+
+Supported subset: a little-endian bundle count/table at offset 8, 12-byte records,
+and a selected WE00 entry with a 16-byte wrapper around a flat 2D DXT1 DDS.
+Unknown record/header fields are preserved, not interpreted. All bundle entries
+are bounds-checked; DDS header sizes, dimensions, mip count and exact payload
+length are checked. Up to 15 zero bytes after the WE00 DDS range are accepted.
+Cube maps, volume textures, other DDS formats and unknown layouts are rejected.
+
+Limits: 64 MiB input, 4,096 bundle entries, 4,096 pixels per dimension and
+4,194,304 pixels total. The parser and PNG preview use only the standard library.
+Stable regular inputs, final-path symlink refusal, exclusive outputs and exit
+statuses follow the WESYS tool. A later write failure may leave earlier outputs;
+discard outputs from a failed run. No texture is included in the repository.

@@ -1,8 +1,8 @@
 # Project status
 
 PES 2013 runs in Winlator: peak 60 FPS, with choppy gameplay throughout the match.
-Repeated menu effects remain unresolved. Asset research now has tested AFS and
-WESYS readers, with verified extraction and decoding. See [DECISION_001.md](DECISION_001.md)
+Repeated menu effects remain unresolved. Asset research now has a verified DXT1
+texture extraction and PNG preview. See [DECISION_001.md](DECISION_001.md)
 for the next development direction.
 
 ## Verified deliverables
@@ -17,11 +17,13 @@ for the next development direction.
   extraction of one raw entry by index, with an output checksum.
 - `tools/wesys_unpack.py`: bounded zlib decoding of the observed WESYS variant,
   with exact length/checksum checks and input/output hashes.
+- `tools/pes_texture.py`: bounds-checked bundle/WE00 inspection, byte-exact DXT1
+  DDS extraction, mip metadata and a PNG preview of the largest level.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
-- **106 tests pass** on Python 3.11.9. Commands and results are in
+- **152 tests pass** on Python 3.11.9. Commands and results are in
   [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
 - The phone gameplay report is recorded in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
@@ -53,6 +55,12 @@ instructions and game behaviour remain unverified. Details and hashes are in
 [research/pes2013.md](research/pes2013.md). Full reports and decoded bytes remain
 under ignored `private/`; no proprietary content is included in source.
 
+`dt08.img` entry 2 has been extracted, decoded and inspected: a 256 × 256 DXT1
+texture with nine mip levels. The DDS extraction matches the source bytes; its
+PNG preview was visually checked and compared with macOS's independent decoder
+(maximum RGB difference 1/255; alpha matches). This provides a local texture
+sample for a viewer. Its in-game use and all mesh formats remain unverified.
+
 ## Phone result
 
 - PES 2013 launches after a fresh installation. The earlier
@@ -75,9 +83,9 @@ under ignored `private/`; no proprietary content is included in source.
 
 ## Next three tasks
 
-1. Find a texture or mesh candidate in another AFS container and verify that the
-   WESYS decoder supports its wrapper.
-2. Implement the smallest reader for that candidate; document its version and
-   verify dimensions/geometry and output before adding rendering code.
-3. Check the Android SDK/NDK/SDL3 setup and build an original ARM64 test scene.
-   Device installation and rendering will need separate verification.
+1. Check the Android SDK/NDK/SDL3 setup and prepare the smallest original ARM64
+   OpenGL ES test application.
+2. Build and verify a triangle/textured-cube scene using an original test texture,
+   then support the locally supplied verified PNG without packaging game assets.
+3. Install on the Note20 and verify rendering, touch/controller input and logs.
+   Device connectivity and native rendering still need verification.
