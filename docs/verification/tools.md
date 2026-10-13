@@ -472,3 +472,39 @@ proprietary material shaders or Android model rendering. Details and hashes are 
 The manual Winlator report is recorded separately in
 [the phone baseline](../benchmarks/pes2013-baseline.md); sustained performance
 has not been measured.
+
+## Executable reconnaissance
+
+```bash
+.venv/bin/python -m pytest -q
+.venv/bin/python tools/pe_recon.py --input '/path/to/pes2013.exe' \
+  --string dt0b.img --string dt0c.img --string dt0e.img \
+  --json private/reports/engine-anchors.json
+```
+
+The suite passes: **407 tests in 1.30 seconds**, Python 3.11.9. Three new tests
+use the existing original PE fixture. They check IAT/ASCII/pointer addresses,
+call/jump-shaped byte candidates, exclusion of non-executable sections, missing
+selectors, scan/count/file limits, unsupported CPUs, special files and output
+protection. Deliberately embedded byte patterns remain labelled candidates;
+this scanner does not manufacture instruction boundaries or function names.
+The original PE CLI and its tests still pass after exposing validation of an
+in-memory snapshot for reuse. No package is installed.
+
+The real-file command returns 0. It scans 353,863,680 cumulative section bytes
+within the 1 GiB work cap. Three archive-name VAs and their literal pointer
+bytes agree with an independent `struct` parse of the DOS/PE section headers.
+An independent SHA-256 agrees before/after inspection. Adjacent data records
+pair archive and directory pointers; fields/consumer behaviour remain unknown.
+The seven selected import slots yield no direct call/jump byte candidates.
+Section entropy suggests transformed code but does not prove its mechanism.
+Apple LLVM's unchanged-input debug-directory error and the unverified
+Ghidra/REA setup are recorded in
+[the engine findings](../research/pes2013-engine.md). No original game function
+has been recovered, executed or ported. Full reports remain private.
+
+The same command against the supplied Winlator installation copy also returns
+0. Both executable files have the same size and SHA-256; an independent `cmp`
+returns 0 and both reconnaissance JSON reports compare equal. The copy does not
+resolve the static-code limitation. Only `pes2013.exe` was compared; no claim is
+made about equality of the full game directories or original-build provenance.

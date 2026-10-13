@@ -1,4 +1,4 @@
-# Continue with asset readers
+# Preserve the original game and investigate its engine
 
 PES 2013 is playable through Winlator. The manual phone result is peak 60 FPS
 with choppy gameplay throughout the match. PulseAudio did not resolve repeated
@@ -6,9 +6,10 @@ menu effects; music and commentary remain clear. This establishes compatibility
 for the tested copy, but does not establish smooth sustained performance or the
 cause of the stutter.
 
-Continue original native research without requiring further Winlator benchmarks.
-Keep the working compatibility setup available for gameplay and record later
-tuning separately.
+Continue reverse engineering with the original game behaviour as the target.
+The native viewer is an investigation tool. Player movement, kicking and physics
+should not be invented as a replacement game under this scope. Keep the working
+compatibility setup available; record later tuning separately.
 
 Start with the actual AFS containers. The new reader has inspected all 19 local
 `.img` files and extracted one entry with a verified checksum. It uses no new
@@ -44,8 +45,12 @@ should hold at its final sample rather than automatically loop. Portable C++
 deformation now passes the original checks and the full sampled comparison.
 Bounded local loading and sample timing now pass, and the clip plays on the
 Note20 with checked endpoint, pause/resume, replay, lifecycle and file fallback
-behaviour. Proceed to the native-engine feasibility decision in PLAN.md before
-choosing a small original playable scope. See
+behaviour. Proceed to original executable tracing in PLAN.md. Initial
+reconnaissance maps imports and archive-directory records, but function tracing
+is limited by this copy's main on-disk code. The supplied Winlator installation
+copy is byte-for-byte identical. Next establish supported runtime file/API
+logging for the installed Winlator build; do not invent engine behaviour. See
+[the engine findings](research/pes2013-engine.md). See
 [the playback results](verification/native-playback.md),
 [the deformation results](verification/native-animation.md) and
 [the pose evidence and limits](research/pes2013.md#one-evaluated-pose).

@@ -5,7 +5,9 @@ Repeated menu effects remain unresolved. The separate native viewer now renders
 one checked PES 2013 ball with its colour texture and plays one verified dense
 skeletal clip from local storage. See [DECISION_001.md](DECISION_001.md)
 for the development direction and [PLAN.md](PLAN.md) for the next results and
-their verification checks.
+their verification checks. The development target is the original game through
+compatibility or an evidenced native/hybrid implementation; the viewer supports
+that research, and a separate original football simulation is outside the current scope.
 
 ## Verified deliverables
 
@@ -109,9 +111,9 @@ their verification checks.
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
-- **404 tests pass** on Python 3.11.9. Earlier tool results are in
-  [verification/tools.md](verification/tools.md), and the latest exporter result
-  is in [verification/native-playback.md](verification/native-playback.md).
+- **407 tests pass** on Python 3.11.9. Earlier tool results are in
+  [verification/tools.md](verification/tools.md), and the latest inspection result
+  is in [verification/tools.md#executable-reconnaissance](verification/tools.md#executable-reconnaissance).
   Usage is in [TOOLS.md](TOOLS.md).
 - The phone gameplay report is recorded in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
@@ -126,6 +128,18 @@ their verification checks.
   coherent motion and PS4 Options/Triangle; portrait/landscape screenshots are
   saved privately. Geometry uses simple white lighting. No game files enter the
   APK or Git. See [the playback record](verification/native-playback.md).
+- `tools/pe_recon.py` maps selected x86 PE32 import slots, ASCII anchors,
+  literal pointer candidates and section entropy without executing the game.
+  Three focused synthetic tests cover address mapping, ambiguous byte matches,
+  work/file limits and output protection. All 407 Python tests pass. Independent
+  section-header calculations verify three real archive-name addresses. Original
+  data records pair ball/player/animation archives with directory strings.
+  This executable's large `.text` section has near-maximal byte entropy and no
+  selected indirect-call/jump shapes; no engine function is claimed. Apple LLVM
+  also refuses its malformed debug-directory size. The supplied Winlator
+  installation copy is byte-for-byte identical, with matching reports.
+  Readable original code is still required for function tracing. See
+  [the executable record](research/pes2013-engine.md).
 
 ## Local game observations
 
@@ -194,9 +208,12 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## Next three tasks
 
-1. Update the native-engine feasibility decision using the verified viewer and
-   animation results, with explicit gaps in gameplay support.
-2. Define one small original playable interaction before adding player control,
-   ball physics or animation transitions. Do not infer the proprietary behaviour.
-3. Measure animation frame times/memory when needed for performance work; the
-   existing static ball baseline does not establish animation performance.
+1. Confirm the installed Winlator version and supported file/API logging. The
+   supplied installation copy has the same executable bytes; static tracing
+   remains limited. Preserve the working installation.
+2. Capture a short launch/menu and match-loading trace with a stated method.
+   Record observed files/API arguments separately from hypotheses. A readable
+   code view and verified analysis tool are still needed to recover functions;
+   Ghidra installation requires approval.
+3. Specify and compare one small original function/subsystem before any native
+   replacement, then use that evidence to choose the next porting step.

@@ -1,14 +1,23 @@
-# Native PES asset research plan
+# Investigate the original PES engine
 
-The native app displays one verified PES 2013 ball with its own texture.
-The viewer has a repeatable device measurement baseline. One 19-bone model and
-a structurally matching dense clip now have checked metadata, poses and a full
-sampled sequence. Portable C++ deformation, bounded local loading and timed playback now agree
-with those results, and the clip plays on the Note20. The next target is a
-native-engine feasibility decision and a small explicit gameplay scope. Each step ends
-with a result we can inspect and repeat.
-Advance only when its checks pass, or record a specific blocker and change the
-approach. The working Winlator installation remains the route for playing PES.
+The goal is to carry the original PES 2013 game behaviour to Android through
+compatibility, translation or an evidenced native/hybrid implementation.
+The asset viewer supports that investigation. It is not the start of a separate
+football game with invented physics, AI or rules.
+
+Static ball rendering and one dense skeletal clip work on the Note20. The next
+step follows the original executable's file loading and platform boundaries.
+Initial reconnaissance now identifies import slots and archive-directory data,
+but this copy's main on-disk code remains unsuitable for confident function
+tracing. See [the executable record](research/pes2013-engine.md).
+The supplied Winlator installation copy has identical executable bytes. First
+check that build's supported file/API logging and record a short launch/menu and
+match-loading run. Runtime observations can establish platform boundaries and
+loading order, but do not recover function instructions by themselves.
+
+Advance after verified results or an explicit blocker and revised approach.
+Keep the working Winlator installation available for the original game. The
+completed asset work and its checks are retained below as supporting evidence.
 
 ## What already works
 
@@ -151,20 +160,39 @@ All package-loaded real poses exactly match the verified native output. The
 replay, background exclusion and file fallback checks. The user confirms coherent
 motion and PS4 controls. See [the playback record](verification/native-playback.md).
 Interpolation, looping, materials, events and game-action meaning remain
-separate questions. Proceed to the feasibility decision below.
+separate questions. Proceed to original engine tracing below.
 
-## Decide what a native game would require
+## Trace one original engine path
 
-Use the viewer and animation results to write an engine feasibility decision.
-List the systems still missing: player control, ball physics, collision,
-animation transitions, rules, AI, cameras, audio, menus and persistence.
-Executable research needs verified tooling and function-level evidence.
+First establish a readable view of the original code and a working analysis
+tool. Fingerprint an untouched executable separately if one is available;
+addresses and results from the current copy must not be assumed to match it.
+The current file's import slots and archive-directory records are starting
+anchors, not function names. Do not turn arbitrary bytes into a claimed call graph.
 
-Choose an explicit next scope: deeper compatibility work, continued asset
-research, or a small original football simulation. An original simulation needs
-its own behaviour specification and tests; displaying PES assets does not
-reproduce the proprietary engine. A complete native PES port has no supported
-estimate at this point.
+Trace an actual consumer of the archive records or a verified file-I/O caller.
+Record the input hash, function address, instructions, arguments, constants and
+callers. Follow one bounded path before broadening the map to graphics setup,
+timing and the update loop. A native equivalent requires input/output comparisons
+with original behaviour; passing our own fixtures alone is insufficient.
+
+Complete when one original function or small subsystem has an evidenced
+behaviour description and a repeatable comparison. If static code is unavailable,
+state the blocker and design a bounded observation of the legitimately running
+game. Do not infer or bypass its protection mechanism.
+
+## Choose a porting route from engine evidence
+
+Keep the original game logic as the target. Evaluate whether the observed
+Windows/x86 boundaries can remain under compatibility, be translated, or be
+replaced incrementally by verified native components. Distinguish an executable
+that runs through translation from a native ARM64 implementation.
+
+Rendering extracted objects does not establish support for simulation, scripts,
+physics, AI, animation transitions, audio, rules, menus or persistence. Investigate
+these systems through original code and runtime evidence; do not invent their
+behaviour to fill the gaps. There is no supported estimate for a full native port.
+An original football simulation would require a separate explicit scope choice.
 
 ## Working rules
 

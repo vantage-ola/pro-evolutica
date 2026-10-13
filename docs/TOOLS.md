@@ -423,3 +423,30 @@ reader: 32 MiB, 128 bones, 65,535 vertices, 600,000 triangle-list indices,
 512 samples, two million vertex-samples and 1–240 FPS. Keep packages and reports
 under ignored `private/`. Discard outputs after any failed write. See
 [loading and controls](ANDROID.md#load-a-local-animation).
+
+## Map executable investigation anchors
+
+```bash
+.venv/bin/python tools/pe_recon.py --input '/path/to/pes2013.exe' \
+  --string dt0b.img --string dt0c.img --string dt0e.img \
+  --json private/reports/engine-anchors.json
+```
+
+The read-only x86 PE32 scanner reports preferred addresses, section entropy and
+hashes, selected import IAT addresses, NUL-terminated ASCII anchors and literal
+pointer byte candidates. Its default imports cover file I/O, Direct3D creation,
+timing and message polling. Repeat `--import Name` to replace that selection.
+An absent API/string produces no matches; it does not prove the game never uses it.
+
+`FF 15`/`FF 25` matches are raw call/jump-shaped bytes in executable sections,
+not decoded instructions or a call graph. Pointer matches can also be data or
+coincidences. Confirm instruction boundaries, function ownership and callers in
+an analysis tool before naming engine functions. Entropy alone does not prove
+packing or encryption. The scanner never executes or modifies the input.
+
+Limits: 64 MiB regular, stable, non-symlink input; at most 16 distinct selectors
+per kind, each 1–256 printable ASCII bytes; 64 selected imported symbols;
+128 occurrences per pattern/reference result and 1 GiB cumulative byte-scan
+work. Exceeding a cap refuses the report. Output must be new; keep full game
+reports private. PE32+ and other CPUs are outside this scanner's supported subset.
+See [the current executable findings](research/pes2013-engine.md).
