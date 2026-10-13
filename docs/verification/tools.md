@@ -13,12 +13,13 @@ Command:
 Exact final output, also saved in [tools-tests.txt](tools-tests.txt):
 
 ```text
-........................................................................ [ 21%]
-........................................................................ [ 42%]
-........................................................................ [ 63%]
-........................................................................ [ 84%]
-.....................................................                    [100%]
-341 passed in 1.36s
+........................................................................ [ 18%]
+........................................................................ [ 37%]
+........................................................................ [ 56%]
+........................................................................ [ 75%]
+........................................................................ [ 94%]
+......................                                                   [100%]
+382 passed in 1.80s
 ```
 
 The test suite generates two-section PE fixtures in pytest temporary directories.
@@ -82,6 +83,10 @@ unsupported sparse/compressed tracks, translation bounds and raw event records.
 Truncation tests require bounded errors rather than unpack exceptions. Both CLI
 paths check exclusive reports and malformed/missing/symlink inputs. The real
 reference readers remain outside the test suite.
+
+The 41 pose tests check original packed rotations, bone transforms and weighted
+geometry. Their cases and the separate real-pose comparison are recorded in
+[Pose evaluation](#pose-evaluation).
 
 ```bash
 .venv/bin/python -m pip check
@@ -343,7 +348,57 @@ The Android app remains the measured static ball viewer. This verifies
 skeletal and dense-clip metadata for one local pair, not animated poses,
 residual-weight ordering or playback. Sparse and compressed translation curves
 remain unsupported. The next check is an original pose fixture followed by a
-real pose comparison before adding deformation.
+real pose comparison before adding deformation. That next check is recorded below.
+
+## Pose evaluation
+
+```bash
+.venv/bin/python -m pytest -q
+.venv/bin/python tools/anm_pose.py \
+  --model private/extracted/reduced-model.ktmdl \
+  --animation private/extracted/selected.anm --core-offset 960 --sequence-offset 816 \
+  --sample 45 --weight-order first \
+  --obj private/extracted/pose45.obj --json private/reports/pose45.json
+shasum -a 256 private/extracted/pose45.obj
+```
+
+The full suite returns 0: **382 passed in 1.80s**, Python 3.11.9. Exact output is
+in [tools-tests.txt](tools-tests.txt). `tests/test_anm_pose.py` adds 41 original
+tests. They cover a literal packing example, all four omitted quaternion
+components, signed components, known axis rotations, bind recovery for all
+supported weight widths/orders, translated joints, absolute local rotations,
+parent/root propagation, unordered bone tables and palette mapping. Invalid
+packing, non-rigid/reflected/non-affine/wrong-inverse matrices, morphs, incomplete
+rotations, missing influences, sample/index limits, mismatched hierarchies,
+input symlinks and output protection are checked. Test inputs contain no game data.
+
+The pose CLI returns 0 for the selected inputs and sample 45. Its report and
+OBJ agree exactly with the separately checked evaluator output. Independent
+`shasum` agrees with the recorded OBJ hash:
+`3ebe1247b03f7d82ca3408aafb7cc6d52c5331d9ea803f9ef91e40d4fc173794`.
+
+Private comparisons check all 1,729 packed rotations against the pinned ANM
+reader, with maximum component error 0. A separate vector/quaternion calculation
+over the independent readers' model/clip data agrees on all 6,736 vertices and
+19 joint origins in sample 45 within 1.056815e-6 source units, for both explicit
+weight choices. Triangle lists agree exactly. This calculation uses exact inverse
+parent rest matrices rather than stored B for local translations. Blender itself
+was not available and was not installed; the comparison is numerical, based on
+the reference source's conventions, not its running add-on or an in-game capture.
+
+A CPU render of the reference positions was visually inspected: the bind model
+is coherent, residual-first gives a coherent raised-arm pose, and residual-last
+badly stretches the geometry. Exact duplicate-position groups also separate
+much further under last (maximum 0.712780 versus 0.011466). This supports first
+for this sample; it does not establish every model's convention or identical
+weights on separate surfaces. Bind roundtrip distance is at most 2.047639e-6
+across both choices. See [the detailed interpretation](../research/pes2013.md#one-evaluated-pose).
+
+Inputs, both OBJs, reference values, source copies, comparison code/output and
+the render remain ignored under `private/`. No dependency was added and no
+game asset or third-party source enters Git/APK. The README and Android app
+are unchanged. Sequence continuity, general animation support, event meaning,
+game materials and Android playback remain unverified.
 
 ## Review and limits
 
@@ -354,7 +409,8 @@ verify script bytecode, other texture formats, full model rendering, REA/Ghidra,
 native rendering or device connectivity. The KTMDL checks additionally verify
 the supported geometry metadata on two local models and exact static ball
 geometry/reference agreement on entry 17. The skeletal/ANM checks verify the
-stated metadata subset for the selected 19-bone pair. They do not verify general skeletons, animation playback,
+stated metadata subset and one evaluated pose for the selected 19-bone pair.
+They do not verify general skeletons, animation playback,
 proprietary material shaders or Android model rendering. Details and hashes are in
 [the model research record](../research/pes2013.md#selected-ktmdl-model-samples).
 The manual Winlator report is recorded separately in

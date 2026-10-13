@@ -320,3 +320,44 @@ The optional model check requires exact ordered parent-link agreement; that is
 a structural pairing check, not proof of correct animated deformation. Input
 files use the existing stable regular-file and final-path symlink checks. No new
 dependency is needed. Keep source chunks and full reports under ignored storage.
+
+## Evaluate one dense animation pose
+
+```bash
+.venv/bin/python tools/anm_pose.py \
+  --model private/extracted/reduced-model.ktmdl \
+  --animation private/extracted/selected.anm --core-offset 960 --sequence-offset 816 \
+  --sample 45 --weight-order first \
+  --obj private/extracted/pose45.obj --json private/reports/pose45.json
+```
+
+This evaluates one integer sample and exports geometry-only OBJ, with one object
+per packet. `--weight-order` is required: `first` puts the leftover weight before
+the explicit weights; `last` puts it after them. The selected real pose supports
+`first`; this is not a rule for every model. Omit `--animation` and its sample/offset
+options to check the bind pose. Without a sequence header, sample time stays
+unknown. No looping or interpolation is assumed.
+
+The evaluator uses A as the global rest matrix and B as its inverse. File matrices
+use row vectors, with translation in the final row. Local rest is A × parent B;
+clip rotations replace local rotations and missing translation tracks retain
+local rest translations. Child global transforms are local × parent global.
+Each vertex is transformed by B × animated global for its palette-mapped bones,
+then blended. Weights are normalized after clamping the inspector's permitted
+rounding excess. Source axes and units stay unchanged.
+
+Only rigid affine binds are supported: orthogonality, positive unit determinant,
+affine entries and inverse agreement must be within 2e-5. Every bone needs a dense
+rotation track. Packed rotations return XYZW using the observed six-byte layout;
+a set reserved bit or stored components exceeding unit length is refused.
+Input/metadata bounds are inherited from the inspectors, with a further aggregate
+200,000-index export cap. Morph records are refused. The extra-record count is
+reported without interpreting that data.
+
+JSON records input hashes, sample/time, explicit weight choice, global bone
+matrices, counts, posed bounds, maximum displacement and OBJ hash. OBJ has positions
+and triangle faces only: no normals, UVs, materials or game shaders. It is a local
+research output and is not ready for the Android viewer's static OBJ loader.
+Output paths must be new and distinct; discard outputs after any failed write.
+No dependencies, app changes or proprietary fixtures are added. See
+[the pose checks](verification/tools.md#pose-evaluation).

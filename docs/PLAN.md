@@ -2,8 +2,9 @@
 
 The native app displays one verified PES 2013 ball with its own texture.
 The viewer has a repeatable device measurement baseline. One 19-bone model and
-a structurally matching dense clip now have checked metadata. The next target
-is a verified pose. Each step ends with a result we can inspect and repeat.
+a structurally matching dense clip now have checked metadata and one evaluated
+pose. The next target is a checked short sequence. Each step ends with a result
+we can inspect and repeat.
 Advance only when its checks pass, or record a specific blocker and change the
 approach. The working Winlator installation remains the route for playing PES.
 
@@ -123,8 +124,14 @@ Current result: the selected 19-bone model and dense clip have matching parent
 links. Bone records, raw weights/palettes, 91 samples, 30 FPS sequence timing and
 20 payloads agree with pinned readers. Original inspection fixtures pass.
 See [the pair and remaining unknowns](research/pes2013.md#skeleton-and-dense-animation-samples).
-Residual-weight ordering and transform space remain unresolved. Next validate
-original pose math and one real pose; do not add playback before those checks.
+The 41 original pose tests now pass. All packed rotations match the pinned reader;
+one real pose agrees with a separate vector/quaternion calculation within
+1.057e-6 source units. Local rotations, retained rest translations and
+residual-first weights produce a coherent pose for this pair. Residual-last
+badly stretches the geometry. See [the pose record](research/pes2013.md#one-evaluated-pose).
+This is a source-based calculation and visual diagnostic, not an in-game or
+Blender runtime comparison. Next check a short sequence and its continuity
+before implementing native deformation or playback.
 
 ## Decide what a native game would require
 

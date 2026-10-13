@@ -37,6 +37,8 @@ PS4 and portrait/landscape checks. Native measurements now establish a short
 static-scene baseline: 60.039 FPS, p99 19.670 ms and a 25.509 ms maximum interval
 in the final portrait APK. See [the measured conditions and limitations](verification/android.md#native-measurements).
 A selected 19-bone model and structurally matching 30 FPS clip now have checked
-metadata. Continue with original pose fixtures and an independent real-pose
-comparison to settle weight ordering and transform space before deformation.
+metadata. Original pose fixtures and one real-pose comparison now pass, with
+residual-first supported for this sample. Check the short sequence and its
+continuity before native deformation or playback. See
+[the pose evidence and limits](research/pes2013.md#one-evaluated-pose).
 Normal/specular shading remains separate work.

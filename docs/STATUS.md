@@ -72,16 +72,26 @@ their verification checks.
   inspector checks a structurally matching 91-sample clip, its 30 FPS sequence,
   track payloads and raw events. Every reported bone/influence/payload agrees
   with pinned independent readers; archive/chunk hashes are checked. Original
-  two-bone/three-sample fixtures add 77 tests. Weight ordering, matrix-space
-  interpretation and correct poses remain unverified; no animation is in the
-  APK. See [the selected pair](research/pes2013.md#skeleton-and-dense-animation-samples).
+  two-bone/three-sample fixtures add 77 tests. The inspectors preserve raw data;
+  pose evaluation is checked separately below. See
+  [the selected pair](research/pes2013.md#skeleton-and-dense-animation-samples).
+- `tools/anm_pose.py` evaluates one dense sample using rigid bind matrices and
+  an explicit residual-weight order. The 41 original tests check packing, joint
+  rotation, parent/root movement, bind recovery and refusal of unsupported data.
+  All 1,729 selected packed rotations match the pinned reader. Sample 45's 6,736
+  posed vertices and 19 joints agree with an independent vector/quaternion
+  calculation within 1.057e-6 source units. A private CPU diagnostic supports
+  residual-first for this model; residual-last badly stretches the geometry.
+  No Blender runtime or in-game pose was compared. Sequence continuity and
+  Android animation remain unverified. See
+  [the pose evidence](research/pes2013.md#one-evaluated-pose).
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
-- **341 tests pass** on Python 3.11.9. Commands and results are in
+- **382 tests pass** on Python 3.11.9. Commands and results are in
   [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
 - The phone gameplay report is recorded in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
@@ -154,9 +164,9 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## Next three tasks
 
-1. Validate original pose fixtures and packed quaternion decoding; establish
-   transform space and residual-weight ordering on the selected real pair.
-2. Compare one real posed model with an independent reference before adding
-   deformation to the viewer, following [PLAN.md](PLAN.md).
-3. Verify a short supported animation sequence, then use that evidence to update
-   the native-engine feasibility decision. General gameplay remains out of scope.
+1. Check the selected dense sequence against independent poses, including
+   continuity, bounds and residual-first seam behaviour across its samples.
+2. Only after those checks, implement the supported deformation in a portable
+   native module with original fixtures; retain a repeatable reference comparison.
+3. Verify the supported animation on Android before updating the native-engine
+   feasibility decision. General gameplay remains out of scope.
