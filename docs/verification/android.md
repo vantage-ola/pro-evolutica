@@ -170,5 +170,74 @@ the same process continues drawing afterward. Screenshots/logs stay under ignore
 The first submitted frame reports 1080 × 2308 pixels, followed by landscape
 surface resizing and 2400 × 1080 screenshots. Portrait framing passes CPU tests;
 a persistent portrait view has not been visually captured. Long sessions,
-frame-time measurements, controller reconnection and extracted-image loading
-remain unverified.
+frame-time measurements and controller reconnection remain unverified.
+Extracted-image loading is verified below.
+
+## Local PNG texture
+
+The native PNG reader loads a supplied image from the debug app's internal
+`files/texture.png`; it is separate from SDL and OpenGL. The original checkerboard
+remains available when loading or GPU upload fails. The vertex shader reverses
+the vertical UV coordinate to show top-first PNG rows upright.
+
+Host CMake/CTest output:
+
+```text
+5 cube checks passed: geometry, texture, projection, visibility, invalid inputs
+167 PNG checks passed: pixels, filters, CRC, bounds, zlib, ordering, files
+100% tests passed, 0 tests failed out of 2
+Total Test time (real) =   0.20 sec
+```
+
+The same two targets pass with AddressSanitizer and UndefinedBehaviorSanitizer
+(2.38 seconds), using:
+
+```bash
+"$ANDROID_HOME/cmake/3.22.1/bin/cmake" -S native -B private/native-sanitizers -G Ninja \
+  -DCMAKE_MAKE_PROGRAM="$ANDROID_HOME/cmake/3.22.1/bin/ninja" \
+  -DCMAKE_CXX_FLAGS='-fsanitize=address,undefined -fno-omit-frame-pointer' \
+  -DCMAKE_EXE_LINKER_FLAGS='-fsanitize=address,undefined'
+"$ANDROID_HOME/cmake/3.22.1/bin/cmake" --build private/native-sanitizers
+"$ANDROID_HOME/cmake/3.22.1/bin/ctest" --test-dir private/native-sanitizers --output-on-failure
+```
+
+A separate host smoke program, also using both sanitizers, decoded the real
+exported PNG to 262,144 RGBA bytes. `cmp` returned 0 against an independent Python
+reference that used zlib and the exporter’s unfiltered rows. Decoded pixel
+SHA-256 is `94db8bedd52b7e66a6a81b9baa5f60125efa9781f7516429b3e679d789e0b829`;
+CRC32 is `ec75ecf3`. These bytes remain under ignored `private/native-checks/`.
+
+The offline Android build succeeds:
+
+```text
+BUILD SUCCESSFUL in 9s
+36 actionable tasks: 5 executed, 31 up-to-date
+```
+
+APK size: 3,888,806 bytes; SHA-256:
+`70dcb09f2378c20d88a46eb725eec52b33bd2b26ff7d3835b3060b173bae50ec`.
+Signature schemes v1/v2 and ZIP CRC checks pass. Its three native libraries are
+AArch64, there are no `assets/` entries, and an exact-byte scan of every unpacked
+ZIP entry found no copy of the supplied PNG.
+
+ADB installation succeeds on the same Note20. Device checks:
+
+- With an empty texture directory, the app logs
+  `Texture: no texture.png; using checkerboard`; the screenshot shows the checkerboard.
+- An original malformed file logs
+  `Texture: Invalid PNG signature; using checkerboard`; rendering continues.
+- The supplied PNG's device SHA-256 matches
+  `f240ea4fb1487dbbc6f64865b77708aea5708e35096565cc53a1d37579a482bb`.
+  The app logs `Texture loaded: 256x256 RGBA8; pixels CRC32=ec75ecf3`.
+  Screenshots show the atlas on cube faces in different orientations.
+- Touch changes tint with the loaded image. Home/relaunch returns to the same
+  process, with pause/resume logs and the texture still visible afterward.
+
+Screenshots and process-filtered logs remain under ignored
+`private/device/texture/`. The final build was reinstalled and its retained
+texture, decoded-pixel CRC and rendered screenshot were checked again.
+The PS4 controller is detected in this build;
+south-button events were verified in the preceding cube build, but have not
+been observed in this extracted-texture run. This verifies one texture in our
+native renderer; its in-game use, meshes and sustained rendering performance
+remain unknown.

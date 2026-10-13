@@ -5,6 +5,10 @@
 #include <atomic>
 #include <algorithm>
 #include <cmath>
+#include <cerrno>
+#include <system_error>
+#include <stdexcept>
+#include <zlib.h>
 
 namespace {
 struct App {
@@ -41,6 +45,28 @@ void change_colour(App& app, const char* input) {
     SDL_Log("Input: %s; colour=%d", input, app.colour);
 }
 
+void load_texture(App& app) {
+    // The Android adapter chooses the path; the reader has no SDL dependency.
+    const char* directory = SDL_GetAndroidInternalStoragePath();
+    if (!directory) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Texture: %s; using checkerboard", SDL_GetError());
+        return;
+    }
+    try {
+        const auto image = assets::load_png(std::string(directory) + "/texture.png");
+        std::string error;
+        if (!app.cube.set_texture(image, error)) throw std::runtime_error(error);
+        SDL_Log("Texture loaded: %ux%u RGBA8; pixels CRC32=%08lx", image.width, image.height,
+                crc32(0, image.rgba.data(), static_cast<uInt>(image.rgba.size())));
+    } catch (const std::system_error& error) {
+        if (error.code().value() == ENOENT)
+            SDL_Log("Texture: no texture.png; using checkerboard");
+        else SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Texture: %s; using checkerboard", error.what());
+    } catch (const std::exception& error) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Texture: %s; using checkerboard", error.what());
+    }
+}
+
 bool create(App& app) {
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) return false;
     SDL_SetEventFilter(lifecycle, &app);
@@ -65,6 +91,7 @@ bool create(App& app) {
         SDL_SetError("%s", error.c_str());
         return false;
     }
+    load_texture(app);
     int count = 0;
     SDL_JoystickID* gamepads = SDL_GetGamepads(&count);
     if (gamepads && count > 0) {

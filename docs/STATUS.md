@@ -21,12 +21,17 @@ for the next development direction.
   DDS extraction, mip metadata and a PNG preview of the largest level.
 - The native triangle runs on the Note20, with screenshot/log evidence for
   rendering, touch, PS4 X-button input, background/resume and Android Back.
-- The current native scene is a rotating textured cube with an original
-  checkerboard, perspective and depth testing. Its five CPU check groups pass
-  (one CTest target), and the ARM64 APK builds offline. Signature/library checks,
+- The current native scene is a rotating textured cube with a local PNG or an
+  original checkerboard, perspective and depth testing. Both CTest targets pass:
+  five cube check groups and 167 PNG checks, including sanitizer runs. The ARM64
+  APK builds offline. Signature/library checks,
   installation, rendered screenshots, touch/PS4 input and background/resume
   checks pass. See [ANDROID.md](ANDROID.md) and
   [verification/android.md](verification/android.md).
+- The bounded portable PNG reader loads the verified 256 × 256 extracted texture
+  from the app's private storage on the Note20. Its decoded pixels match the
+  independent reference exactly. Missing/malformed-file fallback, touch input
+  and background/resume pass. Game images remain outside the APK and Git.
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
@@ -95,8 +100,8 @@ sample for a viewer. Its in-game use and all mesh formats remain unverified.
 
 ## Next three tasks
 
-1. Add bounded loading of the locally supplied verified PNG, keeping it outside
-   the APK and Git; preserve the original checkerboard as the default.
-2. Verify the loaded texture on the Note20 and add camera orbit/zoom input.
-3. Investigate one evidenced mesh sample; document its structure before adding
+1. Add camera orbit/zoom input and verify it on the Note20.
+2. Investigate one evidenced mesh sample; document its structure before adding
    a parser. Mesh formats and proprietary game behaviour remain unsupported.
+3. Measure native startup time and frame times with the supported texture;
+   retain device evidence and report actual results.

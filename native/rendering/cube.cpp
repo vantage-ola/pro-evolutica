@@ -13,7 +13,8 @@ out vec2 texture_uv;
 out float face_light;
 void main() {
     gl_Position = transform * vec4(position, 1.0);
-    texture_uv = uv;
+    // Images store the top row first; cube UVs put v=0 at the bottom.
+    texture_uv = vec2(uv.x, 1.0 - uv.y);
     face_light = light;
 }
 )";
@@ -118,6 +119,44 @@ bool Cube::create(std::string& error) {
         destroy();
         return false;
     }
+    return true;
+}
+
+bool Cube::set_texture(const assets::Image& image, std::string& error) {
+    GLint maximum = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum);
+    if (maximum <= 0 || !image.width || !image.height || image.width > assets::max_image_dimension ||
+        image.height > assets::max_image_dimension ||
+        std::uint64_t(image.width) * image.height > assets::max_image_pixels ||
+        image.width > static_cast<std::uint32_t>(maximum) ||
+        image.height > static_cast<std::uint32_t>(maximum) ||
+        image.rgba.size() != std::size_t(image.width) * image.height * 4) {
+        error = "Texture dimensions or RGBA byte count are invalid";
+        return false;
+    }
+    GLuint replacement = 0;
+    glGenTextures(1, &replacement);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, replacement);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.width, image.height,
+                 0, GL_RGBA, GL_UNSIGNED_BYTE, image.rgba.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    const GLenum status = glGetError();
+    if (!replacement || status != GL_NO_ERROR) {
+        // A failed allocation can also make mipmap generation fail. Clear all
+        // upload errors so the preserved checkerboard can continue drawing.
+        while (glGetError() != GL_NO_ERROR) {}
+        if (replacement) glDeleteTextures(1, &replacement);
+        glBindTexture(GL_TEXTURE_2D, texture_);
+        error = "Cannot upload RGBA texture; GL=" + std::to_string(status);
+        return false;
+    }
+    glDeleteTextures(1, &texture_);
+    texture_ = replacement;
     return true;
 }
 

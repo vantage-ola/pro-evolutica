@@ -1,8 +1,9 @@
 # Native Android test scene
 
 The triangle established rendering and input on the Note20. The current scene
-draws a rotating cube through OpenGL ES 3, with an original 64 × 64 checkerboard,
-depth testing, perspective and per-face shading. Rotation uses elapsed time;
+draws a rotating cube through OpenGL ES 3, with a locally supplied PNG or an
+original 64 × 64 checkerboard, depth testing, perspective and per-face shading.
+Rotation uses elapsed time;
 portrait views move the camera back to keep the cube visible.
 
 Tapping the screen or pressing a gamepad's south button (X on the tested PS4
@@ -67,9 +68,44 @@ Logs should identify the actual GL renderer/version and include
 `Textured cube frame submitted`. A successful build or that log alone does not prove
 the image looks correct; keep a screenshot and the manual input result.
 
+## Load a local texture
+
+The debug app reads `texture.png` from its own internal storage at startup.
+It uses the checkerboard if that file is missing, unsupported or damaged, and
+logs the reason. No storage permission is needed. With one authorised phone:
+
+```bash
+adb shell run-as com.proevolutica.viewer mkdir -p files
+adb exec-in run-as com.proevolutica.viewer tee files/texture.png \
+  < private/extracted/dt08-entry-00002.png > /dev/null
+adb shell run-as com.proevolutica.viewer sha256sum files/texture.png
+adb shell am force-stop com.proevolutica.viewer
+adb shell am start -n com.proevolutica.viewer/.ViewerActivity
+```
+
+Replace the local input path with your own supported PNG. The `run-as` command
+requires this debug build. Updates installed with `adb install -r` keep the image;
+uninstalling the app removes it. To return to the checkerboard, remove only
+`files/texture.png` with `run-as`, then restart the app.
+
+The portable reader supports non-interlaced, eight-bit RGBA PNGs with filter
+types 0–4. It caps input at 16 MiB, dimensions at 4096 per side, pixels at
+4,194,304 and chunks at 4096. It verifies every chunk CRC, chunk order and exact
+zlib output/input lengths. Symlinks and special files are rejected. RGB,
+palette, grayscale, 16-bit and animated PNGs are unsupported. Metadata, including
+colour profiles, is checked for CRC but not applied. Alpha is decoded unchanged;
+the cube currently uses opaque rendering without blending.
+
+The implementation follows the [PNG format and filter definitions](https://www.w3.org/TR/2003/REC-PNG-20031110/)
+and uses the existing system/NDK zlib library. SDL's
+[internal-storage API](https://wiki.libsdl.org/SDL3/SDL_GetAndroidInternalStoragePath)
+selects the Android path; the reader has no Android or SDL dependency.
+
 ## CPU tests
 
-The geometry, checkerboard and camera math need neither SDL nor Android to test.
+The geometry, checkerboard, camera math and PNG reader need neither SDL nor
+Android to test.
+The host PNG target uses the installed system zlib headers/library.
 With `ANDROID_HOME` pointing to the installed SDK:
 
 ```bash
@@ -81,7 +117,11 @@ With `ANDROID_HOME` pointing to the installed SDK:
 
 Tests check face winding, texture coordinates, opaque checkerboard pixels, known
 perspective/rotation results, visibility through a full rotation at five aspect
-ratios, and rejection of non-finite or invalid camera inputs.
+ratios, and rejection of non-finite or invalid camera inputs. The PNG target uses
+original generated fixtures for exact pixel comparisons across all filters,
+truncation, CRC errors, allocation bounds, invalid chunk order, corrupt zlib
+streams and regular-file restrictions. It has a ten-second timeout so a
+regression in the FIFO check cannot block the test run indefinitely.
 
-Loading the locally extracted PES texture is a later step. Its intended in-game
-use is still unknown; it will remain outside the APK and Git.
+The locally extracted PES texture has been verified on the Note20. Its intended
+in-game use is still unknown; it remains outside the APK and Git.

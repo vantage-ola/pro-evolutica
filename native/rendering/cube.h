@@ -2,11 +2,13 @@
 
 #include <GLES3/gl3.h>
 #include <string>
+#include "../assets/png.h"
 
 // All methods run on the thread with the current GL context.
 class Cube {
 public:
     bool create(std::string& error);
+    bool set_texture(const assets::Image& image, std::string& error);
     void draw(int width, int height, int colour, float angle);
     void destroy();
 
