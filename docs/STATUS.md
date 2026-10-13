@@ -1,7 +1,9 @@
 # Project status
 
-The inspection tools are implemented and tested. Winlator gameplay and
-REA/Ghidra analysis remain unverified.
+The inspection tools are implemented and tested. PES 2013 now launches and runs
+in Winlator according to the phone test report. Gameplay stutters and doubled
+menu sounds remain unresolved; a sustained benchmark and REA/Ghidra analysis
+are pending.
 
 ## Verified deliverables
 
@@ -17,8 +19,9 @@ REA/Ghidra analysis remain unverified.
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
 - **44 tests pass** on Python 3.11.9. Commands and results are in
   [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
-- A blank phone benchmark template is ready in
-  [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md).
+- The first phone gameplay report and next controlled tests are recorded in
+  [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
+  60 FPS is an observed reading, not a measured sustained average.
 
 ## Local game observations
 
@@ -40,20 +43,32 @@ skipped entries. It observed 19 `.img` and 13 `.sfd` files, among other extensio
 No asset parser or format compatibility has been validated. Full reports remain
 under ignored `private/reports/`; no proprietary content is included in source.
 
+## Phone result
+
+- PES 2013 launches after a fresh installation. The earlier
+  `rld.dll failed to initialize (E200)` error no longer blocks launch. The specific
+  installation change responsible has not been isolated.
+- Menus and gameplay work, with reported 60 FPS readings and visible stutters.
+- Menu effects sometimes sound doubled; game music sounds normal.
+- Winlator version, audio driver, resolution, graphics settings and driver/wrapper
+  versions have not been captured. Match duration, frame times and thermal
+  behaviour have not been measured. A recorded full-match test is still pending.
+
 ## REA, Ghidra and device status
 
 - REA and Ghidra were not found in the checked locations. Their versions and
   provider/client `doctor` checks remain unverified.
-- ADB connectivity, Winlator, Android version and gameplay remain unverified.
+- ADB connectivity and Android version remain unverified. Winlator gameplay is
+  reported working; the exact configuration remains pending.
 
 ## Next three tasks
 
-1. Run PES 2013 on the Note20 with 32-bit Windows support,
-   Turnip + DXVK, 800 × 600 and low graphics. Record a boot/gameplay result in the
-   baseline template, even if it fails.
-2. Capture the installed versions, settings and evidence. If rendering fails,
-   record a separate WineD3D attempt; if it works, capture a 10-minute match.
-   Verify that record before moving to the performance milestone.
-3. Configure REA/Ghidra and run both
-   `doctor` checks. Start evidence-based binary investigation only after the
-   current milestone gate and integration checks pass.
+1. Save the working configuration and isolate the menu-audio problem: check for
+   repeated input, test with recording off, then compare audio drivers while
+   keeping other settings fixed.
+2. Capture versions/settings and a 10-minute match at the working configuration.
+   Compare 800 × 600 and 1280 × 720 at low graphics in separate runs. Record frame
+   times, audio, input and heat; verify a repeatable result before further tuning.
+3. After the gameplay baseline is verified, configure REA/Ghidra with approved
+   installs and passing `doctor` checks, then investigate file-loading routines
+   and select one asset format supported by a real sample.
