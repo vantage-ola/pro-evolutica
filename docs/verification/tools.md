@@ -13,8 +13,9 @@ Command:
 Exact final output, also saved in [tools-tests.txt](tools-tests.txt):
 
 ```text
-............................................                             [100%]
-44 passed in 0.55s
+........................................................................ [ 98%]
+.                                                                        [100%]
+73 passed in 0.72s
 ```
 
 The test suite generates two-section PE fixtures in pytest temporary directories.
@@ -29,6 +30,13 @@ Unicode and quoted CSV paths, symlinks, cycles, special files, unreadable files 
 directories, and the entry cap. A race regression replaces an ancestor directory
 with a symlink before a queued child is opened; the scan records an error and does
 not read the outside file. Both tools refuse to overwrite existing inputs/reports.
+
+The 29 AFS tests generate original padded archives and check entry metadata,
+empty slots, streamed hashes, byte-exact extraction, malformed/truncated tables,
+invalid offsets/indices, resource caps, and CLI errors. They also check overwrite
+and symlink refusal, non-blocking FIFO rejection, detection of input mutation,
+and removal of a partial extraction after a truncated read. No proprietary
+fixtures or third-party parser packages are needed.
 
 ```bash
 .venv/bin/python -m pip check
@@ -61,9 +69,33 @@ agree with `file` on architecture and with `shasum -a 256` on hashes. Fingerprin
 and the PES 2013 parser warning are recorded in [../STATUS.md](../STATUS.md).
 Raw JSON/CSV reports remain in ignored `private/reports/`.
 
+## AFS inspection and extraction
+
+`inspect_afs()` inspected all 19 local PES 2013 `.img` archives successfully:
+55,593 slots, including 1,273 empty. Their full SHA-256 fingerprints and entry
+reports were saved under ignored `private/reports/`.
+
+The API and CLI each extracted `dt10.img` entry 1:
+
+```bash
+.venv/bin/python tools/afs_inspect.py \
+  --input "$GAME_ROOT/img/dt10.img" --entry 1 \
+  --output private/extracted/dt10-entry-00001-cli.bin \
+  --json private/reports/dt10-extraction-cli.json
+shasum -a 256 "$GAME_ROOT/img/dt10.img" \
+  private/extracted/dt10-entry-00001-cli.bin
+```
+
+The CLI returned 0. An independent seek/read at offset 2,048 for 1,840 bytes
+matched the extracted bytes exactly. `shasum` agreed with the archive and output
+hashes in [the research record](../research/pes2013.md). `git check-ignore`
+confirmed both the raw extraction and report are excluded from Git.
+
 ## Review and limits
 
 Reports preserve parser warnings; an import list with warnings requires further
-review. These checks verify the diagnostics on macOS ARM64. They do not verify
-asset formats, extracted assets, REA/Ghidra, Winlator boot, rendering, performance
-or device connectivity. REA health checks and the phone benchmark remain pending.
+review. These checks verify the diagnostics and raw AFS extraction on macOS ARM64.
+They do not verify payload decoding, REA/Ghidra, native rendering or device
+connectivity. The manual Winlator report is recorded separately in
+[the phone baseline](../benchmarks/pes2013-baseline.md); sustained performance
+has not been measured.

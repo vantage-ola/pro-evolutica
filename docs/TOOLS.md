@@ -1,6 +1,6 @@
 # Local inspection tools
 
-Use Python 3.11 or newer. Both tools read local files; neither executes a game.
+Use Python 3.11 or newer. The tools read local files; none executes a game.
 Keep game directories outside the repository and reports under `private/`.
 
 ## Setup and tests
@@ -88,3 +88,48 @@ Argument syntax errors return 2. An inventory with read errors saves the availab
 rows with `complete: false`, then returns 1. Review those errors before treating a
 report as exhaustive. If writing one of two requested outputs fails, an earlier
 output may already exist; check the command's exit status.
+
+## Inspect an AFS container and extract one entry
+
+The locally inspected PES 2013 `.img` files have AFS headers. This reader supports
+their flat entry tables; it does not decode the contained assets.
+
+```bash
+.venv/bin/python tools/afs_inspect.py \
+  --input "$GAME_ROOT/img/dt10.img" --json private/reports/dt10-afs.json
+
+mkdir -p private/extracted
+.venv/bin/python tools/afs_inspect.py \
+  --input "$GAME_ROOT/img/dt10.img" \
+  --entry 1 --output private/extracted/dt10-entry-00001.bin \
+  --json private/reports/dt10-extraction.json
+```
+
+Indices start at zero. `dt10.img` slot 0 is empty in the inspected copy; slot 1
+contains 1,840 bytes. Choose entries from the report for other copies. Empty
+slots cannot be extracted. `--entry` and `--output` must be supplied together.
+
+Without `--json`, the report goes to stdout. It contains the archive's name,
+size and SHA-256, entry/empty counts, and each entry's index, offset, size and
+first 16 bytes in hex. Extraction adds the output name, index, size and SHA-256.
+No filename stored inside the archive is used to create an output path.
+
+The reader requires `AFS\0`, then a little-endian unsigned 32-bit count and pairs
+of 32-bit offsets/sizes. It checks table and payload bounds, rejects non-empty
+entries overlapping the header/table, and preserves empty slots. Optional name
+tables and unknown trailing metadata are ignored. It streams the full archive
+hash and selected extraction in 1 MiB chunks. Limits: 100,000 slots, 8 GiB input,
+256 MiB per extraction. Overlapping payloads are allowed; these checks do not
+prove that their contents are valid assets.
+
+Use stable regular files. The final input path cannot be a symlink. Size and
+timestamp checks detect common concurrent changes, but do not provide a file
+snapshot. If a command fails, discard any extraction from that run; an output
+may remain if a later check or report write fails. Output files are created
+exclusively, and existing files/symlinks are refused. Parent directories must
+exist. Exit statuses are 0 for success, 1 for file/format errors and 2 for argument
+errors. Keep extracted bytes under ignored local storage.
+
+This is an independent standard-library implementation. No third-party parser
+was installed or copied. Format references and real-sample checks are in
+[research/pes2013.md](research/pes2013.md).

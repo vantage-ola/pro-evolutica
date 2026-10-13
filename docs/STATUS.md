@@ -1,9 +1,9 @@
 # Project status
 
-The inspection tools are implemented and tested. PES 2013 now launches and runs
-in Winlator according to the phone test report. Gameplay stutters and doubled
-menu sounds remain unresolved; a sustained benchmark and REA/Ghidra analysis
-are pending.
+PES 2013 runs in Winlator: peak 60 FPS, with choppy gameplay throughout the match.
+Repeated menu effects remain unresolved. Asset research now has a tested AFS
+reader and a verified raw entry extraction. See [DECISION_001.md](DECISION_001.md)
+for the next development direction.
 
 ## Verified deliverables
 
@@ -13,15 +13,17 @@ are pending.
   and static imports, with input bounds and CLI errors.
 - `tools/asset_inventory.py`: recursive JSON/CSV metadata and magic bytes, with
   symlink/special-file exclusion and explicit partial-scan errors.
+- `tools/afs_inspect.py`: bounded AFS entry-table inspection, archive hashes and
+  extraction of one raw entry by index, with an output checksum.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
-- **44 tests pass** on Python 3.11.9. Commands and results are in
+- **73 tests pass** on Python 3.11.9. Commands and results are in
   [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
-- The first phone gameplay report and next controlled tests are recorded in
+- The phone gameplay report is recorded in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
-  60 FPS is an observed reading, not a measured sustained average.
+  60 FPS is a peak reading, not a measured sustained average.
 
 ## Local game observations
 
@@ -40,19 +42,24 @@ finding about this executable. PES 2015 produced no parser warnings.
 
 The PES 2013 inventory scanned 42 files, 6,206,731,485 bytes, with no read errors or
 skipped entries. It observed 19 `.img` and 13 `.sfd` files, among other extensions.
-No asset parser or format compatibility has been validated. Full reports remain
-under ignored `private/reports/`; no proprietary content is included in source.
+All 19 `.img` files passed AFS index inspection: 55,593 slots, 1,273 empty.
+One 1,840-byte entry from `dt10.img` was extracted and compared byte-for-byte with
+an independent source read. Its payload remains undecoded. Details and hashes
+are in [research/pes2013.md](research/pes2013.md). Full reports and extracted bytes
+remain under ignored `private/`; no proprietary content is included in source.
 
 ## Phone result
 
 - PES 2013 launches after a fresh installation. The earlier
   `rld.dll failed to initialize (E200)` error no longer blocks launch. The specific
   installation change responsible has not been isolated.
-- Menus and gameplay work, with reported 60 FPS readings and visible stutters.
-- Menu effects sometimes sound doubled; game music sounds normal.
-- Winlator version, audio driver, resolution, graphics settings and driver/wrapper
-  versions have not been captured. Match duration, frame times and thermal
-  behaviour have not been measured. A recorded full-match test is still pending.
+- Menus and gameplay work, with peak 60 FPS and choppiness throughout the match.
+- Menu effects repeat or reverberate, sometimes more than twice; crowd audio may
+  also be affected. Music and commentary sound normal. Switching to PulseAudio
+  produced the same issue; the original driver was not recorded.
+- Winlator version, resolution, graphics settings and driver/wrapper versions
+  have not been captured. Average FPS, frame times and thermal behaviour have not
+  been measured. Further benchmarking is optional for the current asset work.
 
 ## REA, Ghidra and device status
 
@@ -63,12 +70,9 @@ under ignored `private/reports/`; no proprietary content is included in source.
 
 ## Next three tasks
 
-1. Save the working configuration and isolate the menu-audio problem: check for
-   repeated input, test with recording off, then compare audio drivers while
-   keeping other settings fixed.
-2. Capture versions/settings and a 10-minute match at the working configuration.
-   Compare 800 × 600 and 1280 × 720 at low graphics in separate runs. Record frame
-   times, audio, input and heat; verify a repeatable result before further tuning.
-3. After the gameplay baseline is verified, configure REA/Ghidra with approved
-   installs and passing `doctor` checks, then investigate file-loading routines
-   and select one asset format supported by a real sample.
+1. Verify the observed `WESYS` entry wrapper and implement a bounded decoder with
+   synthetic tests if the format evidence supports it.
+2. Identify and inspect one decoded texture, mesh or metadata sample; document
+   supported versions and verify its output before adding rendering code.
+3. Check the Android SDK/NDK/SDL3 setup and build an original ARM64 test scene.
+   Device installation and rendering will need separate verification.
