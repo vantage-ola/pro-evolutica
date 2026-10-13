@@ -9,11 +9,29 @@ The mesh has simple directional lighting; the cube keeps its per-face shading.
 Geometry is framed around its centre and radius. Portrait views move the camera
 back to keep the scene visible, and rotation uses elapsed time.
 
-Tapping the screen or pressing a gamepad's south button (X on the tested PS4
-controller) changes its tint. Android Back closes the app. The renderer stays
+A short screen tap or a gamepad's south button (X on the tested PS4 controller)
+changes its tint. Android Back closes the app. The renderer stays
 separate from SDL's window, input and lifecycle code. No game files are packaged.
 Space or the gamepad Start button (Options on the tested PS4) pauses/resumes
-rotation for inspection. Camera orbit and zoom are not implemented yet.
+rotation for inspection. Moving the camera pauses rotation automatically.
+
+## Inspect the model
+
+- Drag one finger to orbit around the model's centre. Dragging does not change tint.
+- Pinch two fingers apart to zoom in, or together to zoom out.
+- Hold one finger still for at least 0.6 seconds, then release to reset.
+- PS4: left stick orbits; right stick up/down zooms; Triangle resets.
+- PS4 X changes tint; Options toggles rotation.
+- Keyboard: arrows orbit; `=` zooms in; `-` zooms out; R resets; Space toggles rotation.
+
+Reset restores the initial camera, white tint and initial model angle, with
+rotation paused. Camera movement also pauses rotation so the view stays still
+for inspection; resume with Options or Space. Stick input has an 18% dead zone
+and uses elapsed time. The camera stays centred, limits vertical orbit before
+the poles and bounds zoom to keep the scene visible. It accounts for the cube's
+larger radius as well as the normalised mesh. Resize/background/cancel events
+clear touch gestures so a stale finger cannot trigger a tap or reset. The
+resizable SDL window explicitly allows portrait and landscape rotation.
 
 ## Build requirements
 
@@ -171,11 +189,16 @@ truncation, CRC errors, allocation bounds, invalid chunk order, corrupt zlib
 streams and regular-file restrictions. It has a ten-second timeout so a
 regression in the FIFO check cannot block the test run indefinitely.
 
+The camera target checks orbit handedness, default framing, zoom/pitch limits,
+stick dead zones and elapsed-time movement. It projects cube vertices and sphere
+samples across portrait/landscape aspects, camera angles and zoom limits. Touch
+cases cover tap jitter, drag, hold/reset, pinch, cancellation and extra fingers.
+
 The mesh target checks original known positions, normals, UVs and face indices,
 framing through a full rotation at five aspect ratios, CRLF/comments/exponents,
 unsupported records, malformed faces, finite values, degeneracy, allocation
 limits and regular-file/symlink/FIFO restrictions. It also has a ten-second
-timeout. All three targets pass normally and with address/undefined-behaviour
+timeout. All four targets pass normally and with address/undefined-behaviour
 sanitizers. Device results and asset checksums are in
 [verification/android.md](verification/android.md#static-ball-model).
 

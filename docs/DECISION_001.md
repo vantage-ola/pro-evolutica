@@ -32,5 +32,6 @@ The spatial sample is now identified as a ball. Its static OBJ geometry matches
 an independent reader exactly, including strip winding, normals and both UV
 sets. The portable reader and Android renderer now display it with the selected
 DXT1 colour texture. Source-byte checks and a separate visual reference agree;
-fallback, input and lifecycle checks pass. Continue with orbit/zoom/reset and
-native measurements. Normal/specular shading and animation remain separate work.
+fallback, input and lifecycle checks pass. Orbit/zoom/reset now pass touch,
+PS4 and portrait/landscape checks. Continue with native measurements.
+Normal/specular shading and animation remain separate work.

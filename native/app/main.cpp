@@ -16,12 +16,16 @@ struct App {
     SDL_GLContext context = nullptr;
     SDL_Gamepad* gamepad = nullptr;
     Cube cube;
+    camera::View view;
+    camera::Touch touch;
+    bool gamepad_moving = false;
     int colour = 0;
     bool vsync = false;
     bool mesh_loaded = false;
     bool paused = false;
     float angle = .6f;
     // Android can deliver lifecycle events from a different thread.
+    std::atomic<bool> clear_touch{false};
     std::atomic<bool> active{true};
     std::atomic<bool> running{true};
 };
@@ -33,6 +37,7 @@ bool SDLCALL lifecycle(void* userdata, SDL_Event* event) {
         app.running = false;
         return false;
     case SDL_EVENT_WILL_ENTER_BACKGROUND:
+        app.clear_touch = true;
         app.active = false;
         return false;
     case SDL_EVENT_DID_ENTER_FOREGROUND:
@@ -51,6 +56,54 @@ void change_colour(App& app, const char* input) {
 void pause_rotation(App& app) {
     app.paused = !app.paused;
     SDL_Log("Rotation %s; angle=%.9g", app.paused ? "paused" : "resumed", app.angle);
+}
+
+void camera_log(App& app, const char* input) {
+    SDL_Log("Camera: %s; yaw=%.6g; pitch=%.6g; zoom=%.6g", input,
+        app.view.yaw, app.view.pitch, app.view.zoom);
+}
+
+void reset_view(App& app) {
+    app.view.reset();
+    app.angle = .6f;
+    app.paused = true;
+    app.colour = 0;
+    camera_log(app, "reset (rotation paused)");
+}
+
+void touch_input(App& app, const SDL_TouchFingerEvent& event) {
+    int width = 0, height = 0;
+    if (!SDL_GetWindowSize(app.window, &width, &height) || width <= 0 || height <= 0) return;
+    const float x = event.x * width, y = event.y * height;
+    const double seconds = double(event.timestamp)/1'000'000'000.0;
+    if (event.type == SDL_EVENT_FINGER_DOWN) app.touch.down(event.fingerID,x,y,seconds);
+    else if (event.type == SDL_EVENT_FINGER_MOTION) {
+        const float old_yaw = app.view.yaw, old_pitch = app.view.pitch, old_zoom = app.view.zoom;
+        app.touch.move(event.fingerID,x,y,float(std::min(width,height)),app.view);
+        if (old_yaw != app.view.yaw || old_pitch != app.view.pitch || old_zoom != app.view.zoom)
+            app.paused = true;
+    } else if (event.type == SDL_EVENT_FINGER_UP) {
+        switch (app.touch.up(event.fingerID,seconds)) {
+        case camera::Action::tap: change_colour(app,"touch tap"); break;
+        case camera::Action::reset: reset_view(app); break;
+        case camera::Action::orbit: camera_log(app,"touch orbit"); break;
+        case camera::Action::zoom: camera_log(app,"touch zoom"); break;
+        default: break;
+        }
+    } else app.touch.cancel();
+}
+
+void gamepad_camera(App& app, float seconds) {
+    if (!app.gamepad) return;
+    const auto x = SDL_GetGamepadAxis(app.gamepad,SDL_GAMEPAD_AXIS_LEFTX);
+    const auto y = SDL_GetGamepadAxis(app.gamepad,SDL_GAMEPAD_AXIS_LEFTY);
+    const auto z = SDL_GetGamepadAxis(app.gamepad,SDL_GAMEPAD_AXIS_RIGHTY);
+    const bool moving = camera::stick(x) || camera::stick(y) || camera::stick(z);
+    if (moving) {
+        app.paused = true;
+        camera::gamepad(app.view,x,y,z,seconds);
+    } else if (app.gamepad_moving) camera_log(app,"gamepad orbit/zoom");
+    app.gamepad_moving = moving;
 }
 
 void load_mesh(App& app) {
@@ -103,6 +156,7 @@ void load_texture(App& app) {
 }
 
 bool create(App& app) {
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight Portrait PortraitUpsideDown");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) return false;
     SDL_SetEventFilter(lifecycle, &app);
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
@@ -112,7 +166,7 @@ bool create(App& app) {
         !SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0) ||
         !SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1) ||
         !SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24)) return false;
-    app.window = SDL_CreateWindow("Pro Evolutica", 960, 540, SDL_WINDOW_OPENGL);
+    app.window = SDL_CreateWindow("Pro Evolutica", 960, 540, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (!app.window) return false;
     app.context = SDL_GL_CreateContext(app.window);
     if (!app.context) return false;
@@ -136,6 +190,7 @@ bool create(App& app) {
         else SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Gamepad: %s", SDL_GetError());
     }
     SDL_free(gamepads);
+    SDL_Log("Controls: drag orbit; pinch zoom; hold/release reset; PS4 left stick orbit, right stick Y zoom, Triangle reset, X tint, Options rotation");
     return true;
 }
 
@@ -144,13 +199,31 @@ void handle_input(App& app, const SDL_Event& event) {
     case SDL_EVENT_QUIT:
         app.running = false;
         break;
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+        app.touch.cancel();
+        break;
     case SDL_EVENT_KEY_DOWN:
         if (event.key.key == SDLK_ESCAPE || event.key.key == SDLK_AC_BACK)
             app.running = false;
         else if (event.key.key == SDLK_SPACE && !event.key.repeat) pause_rotation(app);
+        else if (!event.key.repeat) {
+            const auto key = event.key.key;
+            if (key == SDLK_R) reset_view(app);
+            else if (key == SDLK_LEFT || key == SDLK_RIGHT || key == SDLK_UP || key == SDLK_DOWN ||
+                     key == SDLK_EQUALS || key == SDLK_MINUS) {
+                app.paused = true;
+                if (key == SDLK_LEFT || key == SDLK_RIGHT) app.view.orbit(key == SDLK_LEFT ? -.15f : .15f,0);
+                else if (key == SDLK_UP || key == SDLK_DOWN) app.view.orbit(0,key == SDLK_UP ? -.15f : .15f);
+                else app.view.dolly(key == SDLK_EQUALS ? -.15f : .15f);
+                camera_log(app,"keyboard");
+            }
+        }
         break;
     case SDL_EVENT_FINGER_DOWN:
-        change_colour(app, "touch");
+    case SDL_EVENT_FINGER_MOTION:
+    case SDL_EVENT_FINGER_UP:
+    case SDL_EVENT_FINGER_CANCELED:
+        touch_input(app, event.tfinger);
         break;
     case SDL_EVENT_GAMEPAD_ADDED:
         if (!app.gamepad) {
@@ -163,6 +236,7 @@ void handle_input(App& app, const SDL_Event& event) {
         if (app.gamepad && SDL_GetGamepadID(app.gamepad) == event.gdevice.which) {
             SDL_CloseGamepad(app.gamepad);
             app.gamepad = nullptr;
+            app.gamepad_moving = false;
         }
         break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
@@ -170,6 +244,7 @@ void handle_input(App& app, const SDL_Event& event) {
             if (event.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH)
                 change_colour(app, "gamepad south button");
             else if (event.gbutton.button == SDL_GAMEPAD_BUTTON_START) pause_rotation(app);
+            else if (event.gbutton.button == SDL_GAMEPAD_BUTTON_NORTH) reset_view(app);
         }
         break;
     }
@@ -198,6 +273,7 @@ int main(int, char**) {
     Uint64 previous = SDL_GetTicksNS();
     int result = 0;
     while (app.running) {
+        if (app.clear_touch.exchange(false)) app.touch.cancel();
         SDL_Event event;
         while (SDL_PollEvent(&event)) handle_input(app, event);
         if (!app.running) break;
@@ -219,8 +295,9 @@ int main(int, char**) {
         const Uint64 now = SDL_GetTicksNS();
         const float elapsed = std::min(.1f, float(now - previous) / 1'000'000'000.0f);
         previous = now;
+        gamepad_camera(app,elapsed);
         if (!app.paused) app.angle = std::fmod(app.angle + elapsed * .65f, 6.28318530718f);
-        app.cube.draw(width, height, app.colour, app.angle);
+        app.cube.draw(width, height, app.colour, app.angle, app.view);
         const GLenum error = glGetError();
         if (error != GL_NO_ERROR || !SDL_GL_SwapWindow(app.window)) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Frame: GL=0x%x; SDL=%s",

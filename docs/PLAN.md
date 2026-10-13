@@ -1,7 +1,8 @@
 # Native PES asset research plan
 
-The next target is one verified PES 2013 model displayed with its own texture
-in our Android app. Each step ends with a result we can inspect and repeat.
+The native app displays one verified PES 2013 ball with its own texture.
+The next target is repeatable device measurements. Each step ends with a result
+we can inspect and repeat.
 Advance only when its checks pass, or record a specific blocker and change the
 approach. The working Winlator installation remains the route for playing PES.
 
@@ -95,6 +96,12 @@ Report spikes and failures as well as successful results.
 Complete when the model can be inspected from different angles without losing
 it and the measurements identify the tested APK, device and input files.
 Additional materials and scene objects follow only when supported samples exist.
+
+Current result: orbit/zoom/reset are implemented and verified through native
+camera/gesture tests and touch/PS4 device checks. Camera bounds keep the ball
+visible at both zoom limits. See [the camera record](verification/android.md#camera-controls).
+Load/frame-time/memory measurements remain pending; complete them before moving
+to animation.
 
 ## Investigate animation
 

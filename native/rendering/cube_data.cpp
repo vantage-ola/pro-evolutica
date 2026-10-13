@@ -5,7 +5,6 @@
 #include <stdexcept>
 
 namespace cube_data {
-namespace {
 Matrix multiply(const Matrix& a, const Matrix& b) {
     Matrix result{};
     for (int column = 0; column < 4; ++column)
@@ -14,7 +13,6 @@ Matrix multiply(const Matrix& a, const Matrix& b) {
                 result[column * 4 + row] += a[k * 4 + row] * b[column * 4 + k];
     return result;
 }
-} // namespace
 
 Pixels checkerboard() {
     Pixels pixels{};
@@ -31,10 +29,10 @@ Pixels checkerboard() {
     return pixels;
 }
 
-Matrix rotation(float angle) {
-    if (!std::isfinite(angle)) throw std::invalid_argument("Rotation angle must be finite");
+Matrix rotation(float angle, float tilt_angle) {
+    if (!std::isfinite(angle) || !std::isfinite(tilt_angle)) throw std::invalid_argument("Rotation angle must be finite");
     const float cy = std::cos(angle), sy = std::sin(angle);
-    const float cx = std::cos(.45f), sx = std::sin(.45f);
+    const float cx = std::cos(tilt_angle), sx = std::sin(tilt_angle);
     const Matrix yaw{cy,0,-sy,0, 0,1,0,0, sy,0,cy,0, 0,0,0,1};
     const Matrix tilt{1,0,0,0, 0,cx,sx,0, 0,-sx,cx,0, 0,0,0,1};
     return multiply(yaw, tilt);

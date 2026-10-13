@@ -211,7 +211,7 @@ CRC32 is `ec75ecf3`. These bytes remain under ignored `private/native-checks/`.
 The offline Android build succeeds:
 
 ```text
-BUILD SUCCESSFUL in 9s
+BUILD SUCCESSFUL in 8s
 36 actionable tasks: 5 executed, 31 up-to-date
 ```
 
@@ -355,3 +355,85 @@ normal/specular mapping, skinning, animation, camera orbit/zoom and sustained
 frame times remain unverified or unimplemented. Landscape rendering is visually
 checked; portrait framing passes CPU tests but still needs a persistent device
 view. No native FPS benchmark or PES engine/gameplay claim follows from this run.
+
+## Camera controls
+
+The camera orbits the centred scene separately from the model's rotation.
+Touch drag/pinch and PS4 left-stick/right-stick-Y input control orbit and zoom.
+A stationary touch held for at least 0.6 seconds then released, PS4 Triangle,
+or keyboard R resets camera, tint and initial model angle. Inspection movement
+and reset pause rotation; Options/Space resume it.
+
+Yaw wraps, pitch is limited to ±1.45 radians and distance scales by a bounded
+zoom factor of 0.5–3. Minimum distance also accounts for the fallback cube's
+radius. Portrait views move back; the far plane follows camera distance.
+Supported viewport aspect ratios are 0.1–10. Stick input has an 18% dead zone,
+uses elapsed time and handles both signed axis endpoints. Touch tracking caps
+at two fingers, prevents drags/pinches from becoming tint taps and clears on
+cancel, resize and background events. No new runtime dependency is used.
+
+### CPU and build checks
+
+The existing host build commands in [ANDROID.md](../ANDROID.md#cpu-tests) now
+run four native targets. Original fixtures check default framing, orbit
+handedness, pitch/zoom bounds, reset, drift filtering and equivalent stick
+movement across frame intervals. A grid of seven aspects, three zoom levels,
+36 yaw angles and three pitches checks projected cube vertices and sphere
+samples. Gesture cases cover taps/jitter, drag, hold, pinch ratios, coincident
+and extra fingers, duplicate/unknown events and cancellation.
+
+```text
+5 cube checks passed: geometry, texture, projection, visibility, invalid inputs
+109186 camera checks passed: framing, bounds, sticks, touch
+167 PNG checks passed: pixels, filters, CRC, bounds, zlib, ordering, files
+1496 mesh checks passed: geometry, framing, format, bounds, files
+100% tests passed, 0 tests failed out of 4
+Total Test time (real) =   3.79 sec
+```
+
+The same targets pass with AddressSanitizer/UndefinedBehaviorSanitizer in
+5.31 seconds, without diagnostics. Sanitizer output stays in ignored
+`private/native-checks/camera-sanitizers.txt`.
+
+The offline Gradle command builds with the installed toolchain/cache:
+
+```text
+BUILD SUCCESSFUL in 8s
+36 actionable tasks: 5 executed, 31 up-to-date
+```
+
+The APK is 3,979,326 bytes; SHA-256:
+`8bda3c0f4b01c73bdce84f203d146464df437c96b6726ca7a4827a6dff6bda94`.
+Signature schemes v1/v2 and ZIP CRCs pass. Its three native libraries are ELF64
+little-endian AArch64. No `assets/` entries or exact supplied OBJ/PNG bytes occur
+in the archive. Private build/inspection output is under `private/native-checks/`.
+
+### Device checks
+
+`adb install -r` returns `Success`; launch returns `Status: ok`. The retained
+model/image hashes match the previous checked files, and the app logs the same
+682 vertices, 1,144 triangles and texture pixel CRC. The initial view renders
+the coloured ball with the previous framing.
+
+ADB-driven drag logs a changed yaw/pitch without a tint event. A stationary
+800 ms touch resets yaw/pitch to zero, zoom to one and pauses rotation. Keyboard
+zoom commands reach both limits (0.5 and 3); repeated input stays at the limit.
+Inspected screenshots show the whole ball at both distances and after orbit.
+Manual checks confirm touchscreen drag/pinch/hold-release and PS4 left stick,
+right-stick vertical zoom and Triangle reset work without losing the ball or
+accidentally changing tint. Gamepad logs record changing yaw/pitch/zoom, both
+zoom endpoints and reset events. Home/relaunch retains the same process and
+camera view; its pause/resume logs and screenshot agree. Android Back logs
+`Finished main function` and closes the viewer.
+
+The final build makes the SDL window resizable and explicitly allows portrait
+and landscape. Previously, the fixed 960 × 540 window requested landscape.
+The new build requests Android full-user orientation and renders a real
+1080 × 2308 portrait viewport. Portrait drag/tap/hold-reset logs pass, and the
+near-zoom screenshot retains the whole ball. Manual rotation checks confirm
+framing and camera controls work in both portrait and landscape. The shared
+camera/input code also passed the earlier landscape checks.
+
+Private screenshots and process-filtered logs are under `private/device/camera/`.
+Camera controls do not establish sustained frame-time, startup or memory
+measurements. Those remain the next deliverable before animation research.

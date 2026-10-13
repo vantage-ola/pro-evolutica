@@ -52,6 +52,12 @@ their verification checks.
   and Android Back pass. The mesh CTest target adds 1,496 checks; all three
   targets pass normally and with sanitizers. The APK builds offline and contains
   no supplied assets. See [verification/android.md](verification/android.md#static-ball-model).
+- The viewer has bounded orbit, zoom and reset controls. Touch drag/pinch/hold
+  and PS4 sticks/Triangle pass manual checks; ADB drag, hold/reset and zoom-limit
+  screenshots pass. Portrait/landscape framing and controls pass on the phone.
+  Camera movement pauses rotation, and X/Options retain their
+  existing actions. Four native test targets pass normally and with sanitizers;
+  the APK builds offline. See [the camera checks](verification/android.md#camera-controls).
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
@@ -131,9 +137,9 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## Next three tasks
 
-1. Add orbit, zoom and reset controls around the mesh's checked bounds; verify
-   portrait/landscape framing and touch/controller behaviour.
-2. Measure model load time, frame times and memory with a repeatable native run.
+1. Measure model load time, frame times and memory with a repeatable native run.
    No sustained native FPS result is claimed yet.
-3. After those checks, select a skeleton/animation sample and document its
-   hierarchy, weights and timing before implementing it, following [PLAN.md](PLAN.md).
+2. After those checks, select a skeleton/animation sample and document its
+   hierarchy, weights and timing before implementing it.
+3. Build original skeletal fixtures and compare one supported pose with an
+   independent reference before real animation playback, following [PLAN.md](PLAN.md).

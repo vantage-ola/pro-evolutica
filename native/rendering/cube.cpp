@@ -229,13 +229,13 @@ bool Cube::set_texture(const assets::Image& image, std::string& error) {
     return true;
 }
 
-void Cube::draw(int width, int height, int colour, float angle) {
+void Cube::draw(int width, int height, int colour, float angle, const camera::View& view) {
     if (width <= 0 || height <= 0) return;
     glViewport(0, 0, width, height);
     glClearColor(0.035f, 0.05f, 0.075f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(program_);
-    const auto transform = cube_data::transform(angle, float(width) / float(height));
+    const auto transform = view.transform(angle, float(width) / float(height), mesh_ ? 1.f : std::sqrt(3.f));
     glUniformMatrix4fv(transform_, 1, GL_FALSE, transform.data());
     const auto rotation = cube_data::rotation(angle);
     glUniformMatrix4fv(rotation_, 1, GL_FALSE, rotation.data());
