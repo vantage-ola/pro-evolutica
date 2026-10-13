@@ -3,6 +3,9 @@ android ports // reverse engineering of my favourite PES games growing up.
 
 **A milestone-driven engineering project to investigate, run, and prototype Android support for classic Konami football games.**
 
+Week 1 tool usage: [docs/TOOLS.md](docs/TOOLS.md). Verified work and pending device
+tests: [docs/STATUS.md](docs/STATUS.md).
+
 ## Mission
 
 Get **PES 2013** running as well as possible on a **Samsung Galaxy Note20 (Snapdragon 865+, Adreno 650)**, reverse-engineer enough of its PC engine and asset formats to build an **original Android ARM64 prototype**, and create a reusable research toolkit for **Winning Eleven 8/9**.
