@@ -67,13 +67,21 @@ their verification checks.
   SDL lifecycle event watch. This is one static scene, not game performance.
   Conditions, earlier runs and rejected captures are in
   [the measurement record](verification/android.md#native-measurements).
+- Skeletal inspection now preserves the selected model's 19 bone records,
+  34 palettes and all 6,736 vertices' raw weights/indices. A bounded dense ANM
+  inspector checks a structurally matching 91-sample clip, its 30 FPS sequence,
+  track payloads and raw events. Every reported bone/influence/payload agrees
+  with pinned independent readers; archive/chunk hashes are checked. Original
+  two-bone/three-sample fixtures add 77 tests. Weight ordering, matrix-space
+  interpretation and correct poses remain unverified; no animation is in the
+  APK. See [the selected pair](research/pes2013.md#skeleton-and-dense-animation-samples).
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
-- **264 tests pass** on Python 3.11.9. Commands and results are in
+- **341 tests pass** on Python 3.11.9. Commands and results are in
   [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
 - The phone gameplay report is recorded in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
@@ -146,9 +154,9 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## Next three tasks
 
-1. Select one skeleton/animation sample and document its hierarchy, weights and
-   timing before implementing deformation.
-2. Build original skeletal fixtures and compare one supported pose with an
-   independent reference before real animation playback, following [PLAN.md](PLAN.md).
+1. Validate original pose fixtures and packed quaternion decoding; establish
+   transform space and residual-weight ordering on the selected real pair.
+2. Compare one real posed model with an independent reference before adding
+   deformation to the viewer, following [PLAN.md](PLAN.md).
 3. Verify a short supported animation sequence, then use that evidence to update
    the native-engine feasibility decision. General gameplay remains out of scope.

@@ -36,5 +36,7 @@ fallback, input and lifecycle checks pass. Orbit/zoom/reset now pass touch,
 PS4 and portrait/landscape checks. Native measurements now establish a short
 static-scene baseline: 60.039 FPS, p99 19.670 ms and a 25.509 ms maximum interval
 in the final portrait APK. See [the measured conditions and limitations](verification/android.md#native-measurements).
-Continue by selecting and documenting one skeleton/animation sample before
-implementing deformation. Normal/specular shading remains separate work.
+A selected 19-bone model and structurally matching 30 FPS clip now have checked
+metadata. Continue with original pose fixtures and an independent real-pose
+comparison to settle weight ordering and transform space before deformation.
+Normal/specular shading remains separate work.

@@ -13,11 +13,12 @@ Command:
 Exact final output, also saved in [tools-tests.txt](tools-tests.txt):
 
 ```text
-........................................................................ [ 27%]
-........................................................................ [ 54%]
-........................................................................ [ 81%]
-................................................                         [100%]
-264 passed in 1.33s
+........................................................................ [ 21%]
+........................................................................ [ 42%]
+........................................................................ [ 63%]
+........................................................................ [ 84%]
+.....................................................                    [100%]
+341 passed in 1.36s
 ```
 
 The test suite generates two-section PE fixtures in pytest temporary directories.
@@ -70,6 +71,17 @@ attributes, missing normals/UVs, unsupported bones/skinning/morphs, bad metadata
 references/overlap, bounded names and export limits. CLI checks cover distinct
 exclusive outputs, format errors producing no OBJ, and direct script execution
 from another working directory. The reference reader is not a test dependency.
+
+The 77 skeletal/animation tests generate an original two-bone model and a
+three-sample dense clip. They check exact raw matrices, palette indices, one/two/
+three explicit weights and the no-weight case, parent cycles/ranges, table and
+attribute overlap, weight/vertex caps, malformed offsets and non-finite values.
+Animation cases check timing, missing-FPS reporting, structural pairing,
+ordered/terminated track tables, duplicate node/curve pairs, sample counts,
+unsupported sparse/compressed tracks, translation bounds and raw event records.
+Truncation tests require bounded errors rather than unpack exceptions. Both CLI
+paths check exclusive reports and malformed/missing/symlink inputs. The real
+reference readers remain outside the test suite.
 
 ```bash
 .venv/bin/python -m pip check
@@ -267,6 +279,72 @@ is a sample-specific inference supported by visual roles; final rendered UV
 alignment remains a device check. The flat model's debug-name layout failed in
 the pinned reference and is not claimed as a successful full decode.
 
+## Skeletal and animation metadata
+
+With `PES2013_ROOT` pointing to the local game directory, these extraction CLIs
+returned 0 and agreed byte-for-byte with independent archive seek/read results:
+
+```bash
+.venv/bin/python tools/afs_inspect.py --input "$PES2013_ROOT/img/dt0c.img" \
+  --entry 1 --output private/extracted/skinned-entry.bin --json private/reports/skinned-afs.json
+.venv/bin/python tools/wesys_unpack.py --input private/extracted/skinned-entry.bin \
+  --output private/extracted/skinned-bundle.bin --json private/reports/skinned-wesys.json
+.venv/bin/python tools/afs_inspect.py --input "$PES2013_ROOT/img/dt0e.img" \
+  --entry 1 --output private/extracted/animation-entry.bin --json private/reports/animation-afs.json
+```
+
+The selected ranges can be reproduced with this sample-specific extraction.
+It validates the stored wrapper and all bundle ranges, checks the selected
+chunk hashes and writes new files. It does not extend the zlib decoder to a
+new wrapper version or assume other files share this layout.
+
+```python
+import hashlib, struct
+from pathlib import Path
+
+raw = Path("private/extracted/animation-entry.bin").read_bytes()
+assert raw[:8] == b"\0\1\0WESYS"
+assert struct.unpack_from("<II", raw, 8) == (len(raw)-16, 0)
+for data, index, name, expected in [
+    (Path("private/extracted/skinned-bundle.bin").read_bytes(), 2, "reduced-model.ktmdl",
+     "40a19401fed28410c92626f2596d8f9a7abfe5475e5ffd2038e6b325af4716b1"),
+    (raw[16:], 0, "selected.anm",
+     "070901d5e57773790db7ead1e0c6e209cb9fefdee24380404fee80f2dbdc9b9c"),
+]:
+    count, table = struct.unpack_from("<II", data)
+    assert table == 8 and 1 <= count <= 4096
+    entries = list(struct.iter_unpack("<III", data[8:8+count*12]))
+    assert len(entries) == count
+    assert all((not size or off >= 8+count*12) and off+size <= len(data)
+               for off, size, unknown in entries)
+    offset, size, unknown = entries[index]
+    chunk = data[offset:offset+size]
+    assert hashlib.sha256(chunk).hexdigest() == expected
+    with (Path("private/extracted") / name).open("xb") as output:
+        output.write(chunk)
+```
+
+The [skeletal/ANM CLI commands](../TOOLS.md#inspect-skeletal-metadata-and-a-dense-animation)
+return 0 on these chunks. Full archive SHA-256 checks agree with the previous
+inventory. Both standalone chunk hashes and sizes match the
+[research record](../research/pes2013.md#skeleton-and-dense-animation-samples).
+The shared palette count field required checking its actual byte region rather
+than treating it as the index count.
+
+Independent pinned-reader comparisons give exact agreement on all 19 bone
+identifiers/parents/matrix bytes, 34 palettes and 6,736 raw vertex influences.
+Every rotation payload agrees with the reference's packed bytes; repacking
+its translations to float32 agrees with our translation payload hash. All 20
+track node/type/mode/count records, 30 FPS sequence timing and six raw event
+records agree. Files and the comparison script/output stay in ignored
+`private/research/animation/`; no third-party package was installed.
+
+The Android app remains the measured static ball viewer. This verifies
+skeletal and dense-clip metadata for one local pair, not animated poses,
+residual-weight ordering or playback. Sparse and compressed translation curves
+remain unsupported. The next check is an original pose fixture followed by a
+real pose comparison before adding deformation.
+
 ## Review and limits
 
 Reports preserve parser warnings; an import list with warnings requires further
@@ -275,8 +353,9 @@ wrapper and the supported flat DXT1 texture workflow on macOS ARM64. They do not
 verify script bytecode, other texture formats, full model rendering, REA/Ghidra,
 native rendering or device connectivity. The KTMDL checks additionally verify
 the supported geometry metadata on two local models and exact static ball
-geometry/reference agreement on entry 17. They do not verify general skeletons,
-animation, proprietary material shaders or Android model rendering. Details and hashes are in
+geometry/reference agreement on entry 17. The skeletal/ANM checks verify the
+stated metadata subset for the selected 19-bone pair. They do not verify general skeletons, animation playback,
+proprietary material shaders or Android model rendering. Details and hashes are in
 [the model research record](../research/pes2013.md#selected-ktmdl-model-samples).
 The manual Winlator report is recorded separately in
 [the phone baseline](../benchmarks/pes2013-baseline.md); sustained performance

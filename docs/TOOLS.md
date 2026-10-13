@@ -227,7 +227,8 @@ Other attributes retain numeric type/semantic metadata, without decoding values.
 Reports include input SHA-256, version, packet/vertex/index counts, declarations,
 position bounds, restart markers and triangle windows without repeated indices.
 That count does not test triangle area or prove a correct winding order.
-Materials, skeletons, UV values and animation are not parsed.
+Materials, UV values and animation are not parsed. Bone/weight metadata is
+available with the optional `--skeleton` flag below.
 
 Limits: 64 MiB input, 4,096 records per geometry table, 1,000,000 vertices and
 2,000,000 indices per stream and in aggregate. Geometry tables must be disjoint;
@@ -268,3 +269,54 @@ Both output paths must be new and distinct. Input/file errors follow the
 inspector's stable regular-file checks. A format error creates no output;
 a later write error may leave an earlier output, so discard outputs from a
 failed run. Keep converted game models under ignored `private/`.
+
+
+## Inspect skeletal metadata and a dense animation
+
+```bash
+.venv/bin/python tools/ktmdl_inspect.py \
+  --input private/extracted/reduced-model.ktmdl --skeleton \
+  --json private/reports/reduced-model.json
+.venv/bin/python tools/anm_inspect.py \
+  --input private/extracted/selected.anm --core-offset 960 --sequence-offset 816 \
+  --model private/extracted/reduced-model.ktmdl --json private/reports/selected-anm.json
+```
+
+The inputs are standalone chunks from the checked local samples; see
+[the extraction ranges](research/pes2013.md#skeleton-and-dense-animation-samples).
+Core/sequence offsets are explicit and specific to the selected ANM. A core at
+file offset zero needs no `--core-offset`. Omit `--sequence-offset` when timing
+is unknown: FPS stays `null`, with no assumed default. Omit `--model` for clip
+metadata only. All reports must use new paths; omit `--json` for stdout.
+
+`--skeleton` checks acyclic parent links, finite matrices, shared palette ranges
+and raw vertex influences. It preserves both 4 × 4 matrix arrays and their
+product's maximum error from identity. Explicit float weights and all four byte
+indices are retained without normalization or a choice of leftover-weight slot.
+The first explicit-weight-count-plus-one indices must fit the packet palette;
+unused bytes stay uninterpreted. Weights must be finite, within 0–1 and sum to
+at most 1 plus 2e-6 for float rounding. Missing weight attributes are preserved
+as an empty explicit-weight list. No deformation is performed.
+
+Supported skeletal limits: 256 bones, 65,535 vertices, the geometry inspector's
+existing record/index caps, and the observed shared palette region before the
+packet table. The header's count field is 1 in the checked skinned sample even
+though its palette holds 19 indices. Its general count meaning is unresolved;
+other palette layouts are refused. Known metadata tables must be disjoint.
+
+The ANM inspector checks the observed little-endian `FF010001` core,
+`FF010003` hierarchy and `FF010002` track table. Supported curves are dense mode
+3, six-byte packed rotation payloads (`0x1c`) and float3 translations (`0x1d`).
+It checks unique node/curve pairs, sample counts, ordered offsets, payload spans,
+finite translations and up to 15 zero padding bytes. Track payload hashes permit
+byte comparisons; packed quaternions are not decoded. Sparse curves, compressed
+translation and unknown layouts are refused.
+
+Limits: 64 MiB input, 128 uniquely indexed hierarchy nodes, 256 table entries,
+4,096 samples per track, 32 sequence tracks/channels and 256 event records per
+sequence track. Sequence headers report FPS only after their channel/event ranges
+pass checks. Event records retain eight raw uint16 fields with unknown meaning.
+The optional model check requires exact ordered parent-link agreement; that is
+a structural pairing check, not proof of correct animated deformation. Input
+files use the existing stable regular-file and final-path symlink checks. No new
+dependency is needed. Keep source chunks and full reports under ignored storage.

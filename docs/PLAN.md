@@ -1,9 +1,9 @@
 # Native PES asset research plan
 
 The native app displays one verified PES 2013 ball with its own texture.
-The viewer now has a repeatable device measurement baseline. The next target
-is one evidenced skeleton and animation sample. Each step ends with a result
-we can inspect and repeat.
+The viewer has a repeatable device measurement baseline. One 19-bone model and
+a structurally matching dense clip now have checked metadata. The next target
+is a verified pose. Each step ends with a result we can inspect and repeat.
 Advance only when its checks pass, or record a specific blocker and change the
 approach. The working Winlator installation remains the route for playing PES.
 
@@ -118,6 +118,13 @@ from clip names or assume the unverified Squirrel scripts are usable.
 
 Complete when the model's supported pose and motion agree with the reference.
 Only then assemble a small scene using supported objects and animation.
+
+Current result: the selected 19-bone model and dense clip have matching parent
+links. Bone records, raw weights/palettes, 91 samples, 30 FPS sequence timing and
+20 payloads agree with pinned readers. Original inspection fixtures pass.
+See [the pair and remaining unknowns](research/pes2013.md#skeleton-and-dense-animation-samples).
+Residual-weight ordering and transform space remain unresolved. Next validate
+original pose math and one real pose; do not add playback before those checks.
 
 ## Decide what a native game would require
 

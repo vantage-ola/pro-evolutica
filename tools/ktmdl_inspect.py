@@ -1,4 +1,4 @@
-"""Inspect observed little-endian KTMDL 2.1/2.2 geometry; no rendering or export."""
+"""Inspect observed little-endian KTMDL geometry and optional skeletal metadata."""
 
 from __future__ import annotations
 
@@ -167,8 +167,99 @@ def read_model(path: Path | str) -> bytes:
     return data
 
 
-def inspect_ktmdl(path: Path | str) -> dict:
-    report = inspect_model(read_model(path))
+def inspect_skeleton(data: bytes) -> dict:
+    """Preserve observed bone matrices and raw influences without choosing weight order."""
+    report = inspect_model(data)
+    if report["vertex_count"] > 65_535:
+        raise ValueError("skeletal inspection exceeds the vertex limit")
+    tables, ranges = {}, []
+    for field, stride in ((24,176), (40,96), (48,32), (56,80),
+                          (64,48), (72,160), (80,80), (88,48), (124,16), (136,4)):
+        count, base = struct.unpack_from("<Ii", data, field)
+        if count > MAX_RECORDS or (count and (base < HEADER_SIZE or base + count*stride > len(data))):
+            raise ValueError("skeletal metadata table is outside supported bounds")
+        if count:
+            ranges.append((base,base+count*stride))
+        tables[field] = count,base
+    size, base = struct.unpack_from("<Ii", data, 116)
+    ranges.append((base,base+size))
+    # In the selected skinned sample the count field is 1 despite 19 indices.
+    # Support its shared region up to the packet table; do not invent a stride.
+    palette_count,palette_base = struct.unpack_from("<Ii",data,32)
+    palette_end = tables[40][1]
+    if palette_count != 1 or palette_base < HEADER_SIZE or not palette_base < palette_end:
+        raise ValueError("only the observed shared bone palette region is supported")
+    ranges.append((palette_base,palette_end))
+    ranges.sort()
+    if any(a[1] > b[0] for a,b in zip(ranges,ranges[1:])):
+        raise ValueError("skeletal metadata tables/data overlap")
+    count, base = tables[24]
+    if not 1 <= count <= 256:
+        raise ValueError("skeletal inspection requires 1..256 bones")
+    bones = []
+    for i in range(count):
+        offset = base+i*176
+        a = list(struct.unpack_from("<16f",data,offset+16))
+        b = list(struct.unpack_from("<16f",data,offset+80))
+        if not all(math.isfinite(v) for v in a+b):
+            raise ValueError("non-finite bone matrix")
+        parent = struct.unpack_from("<i",data,offset+172)[0]
+        if parent < -1 or parent >= count:
+            raise ValueError("bone parent is out of range")
+        error = max(abs(sum(a[r*4+k]*b[k*4+c] for k in range(4)) - (r == c))
+                    for r in range(4) for c in range(4))
+        bones.append({"index":i,"name_id":struct.unpack_from("<Q",data,offset)[0],
+                      "parent":parent,"matrix_a":a,"matrix_b":b,"a_times_b_identity_error":error})
+    for bone in bones:
+        seen, node = set(),bone["index"]
+        while node != -1:
+            if node in seen:
+                raise ValueError("cyclic bone hierarchy")
+            seen.add(node)
+            node = bones[node]["parent"]
+    packets = []
+    for p in report["packets"]:
+        packet = p["packet_offset"]
+        n, relative = struct.unpack_from("<Ii",data,packet+24)
+        start = packet+relative
+        if n > 256 or (n and (start < palette_base or (start-palette_base)%2 or
+                             start+n*2 > palette_end)):
+            raise ValueError("bone palette is outside its table")
+        palette = list(struct.unpack_from(f"<{n}H",data,start)) if n else []
+        if any(v >= count for v in palette):
+            raise ValueError("bone palette references an unknown bone")
+        attributes = {a["semantic"]:a for a in p["attributes"]}
+        weight, indices = attributes.get(32),attributes.get(33)
+        if weight and (weight["type"] not in (0,1,2) or not indices):
+            raise ValueError("unsupported blend weights or missing blend indices")
+        if indices and (indices["type"] != 11 or not palette):
+            raise ValueError("blend indices require UBYTE4 and a bone palette")
+        spans = sorted((a["offset"],a["offset"]+{0:4,1:8,2:12,11:4}[a["type"]])
+                       for a in p["attributes"])
+        if any(a[1] > b[0] for a,b in zip(spans,spans[1:])):
+            raise ValueError("skeletal vertex attributes overlap")
+        raw = []
+        for v in range(p["vertex_count"]) if indices else ():
+            offset = p["vertex_data_offset"]+v*p["vertex_stride"]
+            weights = list(struct.unpack_from(f"<{weight['type']+1}f",data,offset+weight["offset"])) if weight else []
+            if any(not math.isfinite(w) or w < 0 or w > 1 for w in weights) or sum(weights) > 1+2e-6:
+                raise ValueError("invalid explicit blend weights")
+            slots = list(struct.unpack_from("<4B",data,offset+indices["offset"]))
+            if any(s >= n for s in slots[:len(weights)+1]):
+                raise ValueError("blend index exceeds the packet palette")
+            raw.append({"explicit_weights":weights,"palette_indices":slots})
+        packets.append({"index":p["index"],"palette":palette,"raw_influences":raw})
+    report["skeletal_metadata"] = {"bones":bones,"roots":[b["index"] for b in bones if b["parent"] == -1],
+                                   "packets":packets,"weight_order":"unresolved"}
+    report["limitations"] = ("Geometry positions/indices and skeletal hierarchy/raw matrices/palette/weight ranges only. "
+                             "Materials, other vertex values, triangle area/winding, matrix space, residual-weight slot, "
+                             "deformation and animation remain unverified. The palette region uses the observed shared layout.")
+    return report
+
+
+def inspect_ktmdl(path: Path | str, *, skeleton: bool = False) -> dict:
+    data = read_model(path)
+    report = inspect_skeleton(data) if skeleton else inspect_model(data)
     report["file_name"] = Path(path).name
     return report
 
@@ -177,11 +268,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path, help="standalone extracted .ktmdl")
     parser.add_argument("--json", type=Path, help="new report path; default stdout")
+    parser.add_argument("--skeleton", action="store_true", help="validate bones and preserve raw influences")
     args = parser.parse_args(argv)
     try:
         if args.json and (args.json.exists() or args.json.is_symlink()):
             raise ValueError("output already exists")
-        report = inspect_ktmdl(args.input)
+        report = inspect_ktmdl(args.input, skeleton=args.skeleton)
         output = json.dumps(report, indent=2, allow_nan=False) + "\n"
         if args.json:
             with args.json.open("x", encoding="utf-8") as destination:
