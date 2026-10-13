@@ -19,6 +19,13 @@ for the next development direction.
   with exact length/checksum checks and input/output hashes.
 - `tools/pes_texture.py`: bounds-checked bundle/WE00 inspection, byte-exact DXT1
   DDS extraction, mip metadata and a PNG preview of the largest level.
+- Native triangle renderer compiles without warnings against the installed NDK;
+  its object file is ELF64/AArch64. The SDL3 Android app source and build files
+  are prepared, with touch/gamepad input handlers. Full APK and device checks
+  remain pending; see [ANDROID.md](ANDROID.md) and
+  [verification/android.md](verification/android.md).
+- Android Gradle configuration passes offline with JDK 21 and cached build
+  dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
@@ -78,14 +85,14 @@ sample for a viewer. Its in-game use and all mesh formats remain unverified.
 
 - REA and Ghidra were not found in the checked locations. Their versions and
   provider/client `doctor` checks remain unverified.
-- ADB connectivity and Android version remain unverified. Winlator gameplay is
-  reported working; the exact configuration remains pending.
+- `adb devices -l` returned an empty list. Android version and native device
+  behaviour remain unverified. Winlator gameplay is reported working; the exact
+  configuration remains pending.
 
 ## Next three tasks
 
-1. Check the Android SDK/NDK/SDL3 setup and prepare the smallest original ARM64
-   OpenGL ES test application.
-2. Build and verify a triangle/textured-cube scene using an original test texture,
-   then support the locally supplied verified PNG without packaging game assets.
-3. Install on the Note20 and verify rendering, touch/controller input and logs.
-   Device connectivity and native rendering still need verification.
+1. Supply SDL3 and CMake, then compile/link and inspect the ARM64 triangle APK.
+2. Connect the Note20 and verify the triangle, touch/controller input and
+   background/resume behaviour; keep a screenshot and logs.
+3. After that check passes, add a textured cube with an original texture, then
+   support the locally supplied PNG without packaging game assets.

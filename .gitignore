@@ -22,6 +22,8 @@ build/
 dist/
 .gradle/
 .cxx/
+local.properties
+android/app/libs/
 .DS_Store
 .env
 .env.*
