@@ -27,12 +27,15 @@ SDK, set `cmake.dir=/absolute/path/to/cmake/3.22.1` in ignored
 
 ```bash
 export GRADLE_USER_HOME="$PWD/private/gradle"
-./android/gradlew -p android --offline --no-daemon :app:assembleDebug
+./android/gradlew -p android --no-daemon :app:assembleDebug
 ```
 
 The APK should be at `android/app/build/outputs/apk/debug/app-debug.apk` and
-contain only the `arm64-v8a` native libraries. The offline command deliberately
-fails when a required dependency is absent; install missing packages explicitly.
+contain only the `arm64-v8a` native libraries. The first build needs network
+access to fetch missing Gradle dependencies, including the Prefab CLI used to
+connect SDL's AAR to CMake. Downloads go into the project-local Gradle cache.
+After a successful build, add `--offline` to build using only cached dependencies;
+it fails if a required dependency is missing.
 The wrapper itself downloads Gradle if its distribution is not cached, even with
 `--offline`; its ZIP is pinned to the official SHA-256 in wrapper properties.
 Build verification and current blockers are in

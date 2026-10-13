@@ -4,7 +4,7 @@
 
 The checked Mac has SDK platform 35, Build Tools 34.0.0, NDK 28.2.13676358
 (r28c), JDK 21.0.11, cached Gradle 8.9 and Android Gradle Plugin 8.7.2.
-CMake and SDL3 were not found in the checked locations. The build targets API 23
+CMake 3.22.1 and the SDL3 3.4.18 AAR are now present. The build targets API 23
 or newer and only `arm64-v8a`.
 
 ## Renderer compile
@@ -25,6 +25,21 @@ Both commands returned 0. Compilation emitted no diagnostics; the object header
 reports `ELF64`, little endian, `REL`, `AArch64`. This checks the renderer's C++
 against the real Android headers. It does not link SDL, compile the GPU shaders
 or establish a working APK.
+
+With SDL3 installed, the app source also compiles against its actual AAR headers:
+
+```bash
+"$NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++" \
+  --target=aarch64-linux-android23 -std=c++17 \
+  -Wall -Wextra -Wpedantic -Werror -fPIC \
+  -I private/native-checks/sdl-headers \
+  -c native/app/main.cpp -o private/native-checks/main.o
+```
+
+The include directory contains headers extracted from the installed AAR's
+`prefab/modules/SDL3-Headers/include/` directory. The command returned 0 with no
+diagnostics. This checks compilation of the input/lifecycle code, not linking or
+device behaviour.
 
 ## Build configuration
 
@@ -54,8 +69,11 @@ does not run the CMake compiler, resolve the missing SDL AAR or build an APK.
 
 ## Pending checks
 
-- Full SDL app compilation, native linking, Java compilation and APK packaging
-  require the missing build dependencies.
+- The first offline APK build stopped at CMake configuration because
+  `com.google.prefab:cli:2.1.0` was absent from the Gradle cache. SDK XML version
+  warnings also appeared; the reported task failure was dependency resolution.
+  A build without `--offline` is required to fetch the missing build dependencies.
+  Full APK packaging and native rendering remain unverified.
 - `adb devices -l` returned 0 with an empty device list. No native app has been
   installed or launched on the Note20.
 - Triangle appearance, shader compilation, touch/controller input, rotation and

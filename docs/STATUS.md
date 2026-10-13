@@ -91,7 +91,8 @@ sample for a viewer. Its in-game use and all mesh formats remain unverified.
 
 ## Next three tasks
 
-1. Supply SDL3 and CMake, then compile/link and inspect the ARM64 triangle APK.
+1. Populate the missing Gradle dependency cache (Prefab CLI 2.1.0), then
+   compile/link and inspect the ARM64 triangle APK. SDL3 and CMake are present.
 2. Connect the Note20 and verify the triangle, touch/controller input and
    background/resume behaviour; keep a screenshot and logs.
 3. After that check passes, add a textured cube with an original texture, then
