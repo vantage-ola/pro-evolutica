@@ -35,8 +35,13 @@ def inspect_pe(path: Path | str) -> dict:
         if info.st_size > MAX_FILE_BYTES:
             raise ValueError(f"input exceeds the {MAX_FILE_BYTES}-byte inspection limit")
         data = stream.read(MAX_FILE_BYTES + 1)
+    return inspect_pe_bytes(data, file_name=path.name)
+
+
+def inspect_pe_bytes(data: bytes, *, file_name: str = "snapshot.exe") -> dict:
+    """Inspect an already bounded snapshot without reopening its source file."""
     if len(data) > MAX_FILE_BYTES:
-        raise ValueError("input grew beyond the inspection limit")
+        raise ValueError("input exceeds the inspection limit")
     if len(data) < 64 or data[:2] != b"MZ":
         raise ValueError("not a Windows PE file: missing DOS header")
     pe_offset = struct.unpack_from("<I", data, 60)[0]
@@ -103,7 +108,7 @@ def inspect_pe(path: Path | str) -> dict:
             entry_rva = pe.OPTIONAL_HEADER.AddressOfEntryPoint
             return {
                 "schema_version": 1,
-                "file_name": path.name,
+                "file_name": file_name,
                 "sha256": hashlib.sha256(data).hexdigest(),
                 "file_size": len(data),
                 "architecture": MACHINES.get(pe.FILE_HEADER.Machine, "unknown"),
