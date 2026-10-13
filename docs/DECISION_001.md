@@ -18,6 +18,12 @@ The WESYS decoder now passes synthetic tests and decodes all ten non-empty
 `dt10.img` entries. Their markers indicate likely compiled scripts, with VM
 compatibility and behaviour still unverified. The texture reader now extracts a
 verified 256 × 256 DXT1 DDS from `dt08.img` entry 2 and produces a checked PNG
-preview. Next, build the smallest original ARM64 rendering application with an
-original test texture, then load this locally supplied PNG. Keep the game asset
-outside the APK and Git. Meshes and the proprietary engine remain unsupported.
+preview. The original ARM64 app now renders a cube and loads this local PNG on
+the Note20. The game asset remains outside the APK and Git.
+
+Continue with one evidenced model sample and its texture. Document and validate
+the geometry before adding Android model loading. Camera controls follow that
+model result. Animation and engine feasibility have their own verification
+checks in [PLAN.md](PLAN.md). A bounded inspector now checks geometry metadata
+for two local KTMDL samples. Model rendering and the proprietary engine remain
+unsupported until their respective results exist.

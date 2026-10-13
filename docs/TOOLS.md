@@ -206,3 +206,31 @@ Limits: 64 MiB input, 4,096 bundle entries, 4,096 pixels per dimension and
 Stable regular inputs, final-path symlink refusal, exclusive outputs and exit
 statuses follow the WESYS tool. A later write failure may leave earlier outputs;
 discard outputs from a failed run. No texture is included in the repository.
+
+## Inspect an extracted KTMDL model
+
+```bash
+.venv/bin/python tools/ktmdl_inspect.py \
+  --input private/extracted/dt0b-entry-00017.ktmdl \
+  --json private/reports/model.json
+```
+
+Supply a standalone model extracted from your own asset bundle. The inspector
+does not scan AFS files or extract bundle entries; the research record identifies
+the checked model ranges. Omit `--json` for stdout; output files must be new.
+
+Supported subset: little-endian KTMDL 2.1/2.2, triangle-strip packets, one vertex
+and one 16-bit index stream per packet, and the observed vertex element types
+(one/two/three float32 values or four bytes). Position must be three float32 values.
+Other attributes retain numeric type/semantic metadata, without decoding values.
+
+Reports include input SHA-256, version, packet/vertex/index counts, declarations,
+position bounds, restart markers and triangle windows without repeated indices.
+That count does not test triangle area or prove a correct winding order.
+Materials, skeletons, UV values and animation are not parsed.
+
+Limits: 64 MiB input, 4,096 records per geometry table, 1,000,000 vertices and
+2,000,000 indices per stream and in aggregate. Geometry tables must be disjoint;
+all stream/declaration references stay within their declared regions. The reader
+rejects non-finite positions, out-of-range indices, final-path symlinks, special
+files, changing inputs and existing report paths. It uses only the standard library.

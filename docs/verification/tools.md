@@ -13,10 +13,11 @@ Command:
 Exact final output, also saved in [tools-tests.txt](tools-tests.txt):
 
 ```text
-........................................................................ [ 47%]
-........................................................................ [ 94%]
-........                                                                 [100%]
-152 passed in 1.13s
+........................................................................ [ 33%]
+........................................................................ [ 66%]
+........................................................................ [ 99%]
+.                                                                        [100%]
+217 passed in 1.32s
 ```
 
 The test suite generates two-section PE fixtures in pytest temporary directories.
@@ -54,6 +55,13 @@ errors. Golden DXT1 blocks verify four-colour interpolation, one-bit alpha,
 selector order and clipping for dimensions smaller than or not divisible by four.
 PNG tests verify dimensions, chunk CRCs and decoded RGBA scanlines. No real game
 texture is required by the suite.
+
+The 65 KTMDL tests generate an original flat mesh and stream/declaration tables.
+They check both observed versions, exact counts and bounds, unsupported types
+and primitives, truncated data, table overlap, invalid relative references,
+per-stream/aggregate caps, non-finite positions, out-of-range indices, strip
+restarts and repeated-index windows. File/CLI tests check stable reads,
+symlink/FIFO/directory refusal, JSON output and overwrite protection.
 
 ```bash
 .venv/bin/python -m pip check
@@ -158,13 +166,51 @@ an exact match to the independent decoder. The DDS extraction itself is exact.
 The reference check is separate from pytest and is specific to this local sample.
 `git check-ignore` confirms the DDS, PNG and report are excluded from Git.
 
+## KTMDL geometry metadata
+
+The AFS and WESYS CLIs independently repeated the spatial sample's extraction:
+
+```bash
+.venv/bin/python tools/afs_inspect.py \
+  --input "$GAME_ROOT/img/dt0b.img" --entry 17 \
+  --output private/extracted/dt0b-entry-00017-model-cli.bin \
+  --json private/reports/dt0b-entry-00017-model-afs-cli.json
+.venv/bin/python tools/wesys_unpack.py \
+  --input private/extracted/dt0b-entry-00017-model-cli.bin \
+  --output private/extracted/dt0b-entry-00017-model-cli.decoded.bin \
+  --json private/reports/dt0b-entry-00017-model-wesys-cli.json
+```
+
+Both returned 0. `cmp` returned 0 against the exploratory extraction/decoding.
+The standalone models were taken from bounds-checked bundle entry 0: offset 32,
+size 1,120 for entry 35; offset 64, size 48,384 for entry 17. Independent archive
+seek/read comparisons and `shasum` checks agree with the
+[research record](../research/pes2013.md#selected-ktmdl-model-samples).
+
+```bash
+.venv/bin/python tools/ktmdl_inspect.py \
+  --input private/extracted/dt0b-entry-00017.ktmdl \
+  --json private/reports/dt0b-entry-00017-model-cli.json
+```
+
+The CLI returned 0 and agrees with a separate direct header/stream read on the
+682 vertices and 1,748 indices. The small sample reports four of each. These
+comparisons use the same inferred layout and are not an independent geometry
+decoder. Both models pass the new inspector's bounded ranges, finite-position
+and index checks. `git check-ignore` confirms model files and full reports stay
+private. Model shape, winding, UV/material mapping and transforms still need an
+independent reference before a renderer relies on them.
+
 ## Review and limits
 
 Reports preserve parser warnings; an import list with warnings requires further
 review. These checks verify diagnostics, AFS extraction, the observed WESYS/zlib
 wrapper and the supported flat DXT1 texture workflow on macOS ARM64. They do not
-verify script bytecode, other texture formats, meshes, REA/Ghidra, native rendering
-or device connectivity.
+verify script bytecode, other texture formats, full model rendering, REA/Ghidra,
+native rendering or device connectivity. The KTMDL checks additionally verify
+the supported geometry metadata on two local models; materials, UV values,
+triangle area and winding remain unverified. Details and hashes are in
+[the model research record](../research/pes2013.md#selected-ktmdl-model-samples).
 The manual Winlator report is recorded separately in
 [the phone baseline](../benchmarks/pes2013-baseline.md); sustained performance
 has not been measured.

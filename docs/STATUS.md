@@ -3,7 +3,8 @@
 PES 2013 runs in Winlator: peak 60 FPS, with choppy gameplay throughout the match.
 Repeated menu effects remain unresolved. Asset research now has a verified DXT1
 texture extraction and PNG preview. See [DECISION_001.md](DECISION_001.md)
-for the next development direction.
+for the development direction and [PLAN.md](PLAN.md) for the next results and
+their verification checks.
 
 ## Verified deliverables
 
@@ -19,6 +20,10 @@ for the next development direction.
   with exact length/checksum checks and input/output hashes.
 - `tools/pes_texture.py`: bounds-checked bundle/WE00 inspection, byte-exact DXT1
   DDS extraction, mip metadata and a PNG preview of the largest level.
+- `tools/ktmdl_inspect.py`: bounded geometry metadata for observed little-endian
+  KTMDL 2.1/2.2 triangle-strip packets. Real samples from `dt0b.img` have checked
+  geometry table ranges, finite positions and in-range indices. Rendering,
+  winding, materials and texture pairing remain unverified.
 - The native triangle runs on the Note20, with screenshot/log evidence for
   rendering, touch, PS4 X-button input, background/resume and Android Back.
 - The current native scene is a rotating textured cube with a local PNG or an
@@ -38,7 +43,7 @@ for the next development direction.
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
-- **152 tests pass** on Python 3.11.9. Commands and results are in
+- **217 tests pass** on Python 3.11.9. Commands and results are in
   [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
 - The phone gameplay report is recorded in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
@@ -74,7 +79,15 @@ under ignored `private/`; no proprietary content is included in source.
 texture with nine mip levels. The DDS extraction matches the source bytes; its
 PNG preview was visually checked and compared with macOS's independent decoder
 (maximum RGB difference 1/255; alpha matches). This provides a local texture
-sample for a viewer. Its in-game use and all mesh formats remain unverified.
+sample for a viewer. Its in-game use remains unknown; model work is recorded below.
+
+Mesh research has selected `dt0b.img` entry 35 (a four-vertex flat sample,
+KTMDL 2.1) and entry 17 (a spatial sample with 682 vertices, KTMDL 2.2).
+Their extracted model ranges match source bytes and independent SHA-256 checks.
+The inspector reports 1,748 indices for the spatial sample and 1,144 strip
+triangle windows without repeated indices. Triangle area, winding, texture
+references and the objects' in-game identity remain unverified. The scope and
+hashes are in [research/pes2013.md](research/pes2013.md).
 
 ## Phone result
 
@@ -100,8 +113,9 @@ sample for a viewer. Its in-game use and all mesh formats remain unverified.
 
 ## Next three tasks
 
-1. Add camera orbit/zoom input and verify it on the Note20.
-2. Investigate one evidenced mesh sample; document its structure before adding
-   a parser. Mesh formats and proprietary game behaviour remain unsupported.
-3. Measure native startup time and frame times with the supported texture;
-   retain device evidence and report actual results.
+1. Validate the selected spatial model's geometry, face winding and UVs against
+   an independent reference; keep converted geometry local.
+2. Establish its material/texture references and choose the supported diffuse
+   texture from evidence. Resolve unsupported variants separately.
+3. Load the verified model on the Note20. Add camera controls and measurements
+   after the model renders correctly, following [PLAN.md](PLAN.md).
