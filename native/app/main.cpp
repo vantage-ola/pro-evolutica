@@ -1,15 +1,17 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#include "../rendering/triangle.h"
+#include "../rendering/cube.h"
 #include <atomic>
+#include <algorithm>
+#include <cmath>
 
 namespace {
 struct App {
     SDL_Window* window = nullptr;
     SDL_GLContext context = nullptr;
     SDL_Gamepad* gamepad = nullptr;
-    Triangle triangle;
+    Cube cube;
     int colour = 0;
     bool vsync = false;
     // Android can deliver lifecycle events from a different thread.
@@ -47,7 +49,8 @@ bool create(App& app) {
     if (!SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES) ||
         !SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3) ||
         !SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0) ||
-        !SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1)) return false;
+        !SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1) ||
+        !SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24)) return false;
     app.window = SDL_CreateWindow("Pro Evolutica", 960, 540, SDL_WINDOW_OPENGL);
     if (!app.window) return false;
     app.context = SDL_GL_CreateContext(app.window);
@@ -58,7 +61,7 @@ bool create(App& app) {
     SDL_Log("GL vendor=%s; renderer=%s; version=%s", glGetString(GL_VENDOR),
             glGetString(GL_RENDERER), glGetString(GL_VERSION));
     std::string error;
-    if (!app.triangle.create(error)) {
+    if (!app.cube.create(error)) {
         SDL_SetError("%s", error.c_str());
         return false;
     }
@@ -110,7 +113,7 @@ void destroy(App& app) {
     SDL_SetEventFilter(nullptr, nullptr);
     if (app.gamepad) SDL_CloseGamepad(app.gamepad);
     if (app.context) {
-        app.triangle.destroy();
+        app.cube.destroy();
         SDL_GL_DestroyContext(app.context);
     }
     if (app.window) SDL_DestroyWindow(app.window);
@@ -126,12 +129,15 @@ int main(int, char**) {
         return 1;
     }
     bool first_frame = true;
+    Uint64 previous = SDL_GetTicksNS();
+    float angle = .6f;
     int result = 0;
     while (app.running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) handle_input(app, event);
         if (!app.running) break;
         if (!app.active) {
+            previous = SDL_GetTicksNS();
             SDL_Delay(20);
             continue;
         }
@@ -145,7 +151,11 @@ int main(int, char**) {
             SDL_Delay(20);
             continue;
         }
-        app.triangle.draw(width, height, app.colour);
+        const Uint64 now = SDL_GetTicksNS();
+        const float elapsed = std::min(.1f, float(now - previous) / 1'000'000'000.0f);
+        previous = now;
+        angle = std::fmod(angle + elapsed * .65f, 6.28318530718f);
+        app.cube.draw(width, height, app.colour, angle);
         const GLenum error = glGetError();
         if (error != GL_NO_ERROR || !SDL_GL_SwapWindow(app.window)) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Frame: GL=0x%x; SDL=%s",
@@ -154,7 +164,7 @@ int main(int, char**) {
             break;
         }
         if (first_frame) {
-            SDL_Log("Triangle frame submitted: %dx%d", width, height);
+            SDL_Log("Textured cube frame submitted: %dx%d", width, height);
             first_frame = false;
         }
         if (!app.vsync) SDL_Delay(16);

@@ -19,11 +19,13 @@ for the next development direction.
   with exact length/checksum checks and input/output hashes.
 - `tools/pes_texture.py`: bounds-checked bundle/WE00 inspection, byte-exact DXT1
   DDS extraction, mip metadata and a PNG preview of the largest level.
-- Native triangle renderer compiles without warnings against the installed NDK;
-  its object file is ELF64/AArch64. The SDL3 Android app source and build files
-  are prepared, with touch/gamepad input handlers. The debug APK now builds;
-  signature verification passes and its three native libraries are AArch64 only.
-  Device checks remain pending; see [ANDROID.md](ANDROID.md) and
+- The native triangle runs on the Note20, with screenshot/log evidence for
+  rendering, touch, PS4 X-button input, background/resume and Android Back.
+- The current native scene is a rotating textured cube with an original
+  checkerboard, perspective and depth testing. Its five CPU check groups pass
+  (one CTest target), and the ARM64 APK builds offline. Signature/library checks,
+  installation, rendered screenshots, touch/PS4 input and background/resume
+  checks pass. See [ANDROID.md](ANDROID.md) and
   [verification/android.md](verification/android.md).
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
@@ -86,14 +88,15 @@ sample for a viewer. Its in-game use and all mesh formats remain unverified.
 
 - REA and Ghidra were not found in the checked locations. Their versions and
   provider/client `doctor` checks remain unverified.
-- `adb devices -l` returned an empty list. Android version and native device
-  behaviour remain unverified. Winlator gameplay is reported working; the exact
-  configuration remains pending.
+- ADB sees an authorised `SM_N981U` running Android 13/API 33. The native app
+  reports Adreno 650/OpenGL ES 3.2 and a PS4 controller. Triangle and cube evidence
+  is recorded in [verification/android.md](verification/android.md). The exact
+  Winlator configuration remains pending.
 
 ## Next three tasks
 
-1. Connect the Note20 and install/launch the inspected triangle APK over ADB.
-2. Verify the triangle, touch/controller input and
-   background/resume behaviour; keep a screenshot and logs.
-3. After that check passes, add a textured cube with an original texture, then
-   support the locally supplied PNG without packaging game assets.
+1. Add bounded loading of the locally supplied verified PNG, keeping it outside
+   the APK and Git; preserve the original checkerboard as the default.
+2. Verify the loaded texture on the Note20 and add camera orbit/zoom input.
+3. Investigate one evidenced mesh sample; document its structure before adding
+   a parser. Mesh formats and proprietary game behaviour remain unsupported.

@@ -1,9 +1,13 @@
-# Native Android triangle
+# Native Android test scene
 
-The first native scene draws an original coloured triangle through OpenGL ES 3.
-Tapping the screen or pressing a gamepad's south button changes its tint. Android
-Back closes the app. The renderer stays separate from SDL's window, input and
-lifecycle code. No game files are packaged.
+The triangle established rendering and input on the Note20. The current scene
+draws a rotating cube through OpenGL ES 3, with an original 64 × 64 checkerboard,
+depth testing, perspective and per-face shading. Rotation uses elapsed time;
+portrait views move the camera back to keep the cube visible.
+
+Tapping the screen or pressing a gamepad's south button (X on the tested PS4
+controller) changes its tint. Android Back closes the app. The renderer stays
+separate from SDL's window, input and lifecycle code. No game files are packaged.
 
 ## Build requirements
 
@@ -50,18 +54,34 @@ adb devices -l
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n com.proevolutica.viewer/.ViewerActivity
 mkdir -p private/device
-adb logcat -d -v threadtime -s SDL SDL/APP AndroidRuntime > private/device/triangle.log
-adb exec-out screencap -p > private/device/triangle.png
+adb logcat -d -v threadtime -s SDL SDL/APP AndroidRuntime > private/device/cube.log
+adb exec-out screencap -p > private/device/cube.png
 ```
 
-Check that the triangle appears without stretching in portrait and landscape.
+Check that the checkerboard cube rotates without stretching in portrait and landscape.
 Tap once and check that its tint changes once. Connect a supported gamepad and
 press its south button; check the tint and corresponding input log. Send the app
 to the background and resume it, then check Android Back closes it cleanly.
 
 Logs should identify the actual GL renderer/version and include
-`Triangle frame submitted`. A successful build or that log alone does not prove
+`Textured cube frame submitted`. A successful build or that log alone does not prove
 the image looks correct; keep a screenshot and the manual input result.
 
-Verify this scene before adding a textured cube. Loading the locally extracted
-PES texture is a later step; its intended in-game use is still unknown.
+## CPU tests
+
+The geometry, checkerboard and camera math need neither SDL nor Android to test.
+With `ANDROID_HOME` pointing to the installed SDK:
+
+```bash
+"$ANDROID_HOME/cmake/3.22.1/bin/cmake" -S native -B private/native-tests -G Ninja \
+  -DCMAKE_MAKE_PROGRAM="$ANDROID_HOME/cmake/3.22.1/bin/ninja"
+"$ANDROID_HOME/cmake/3.22.1/bin/cmake" --build private/native-tests
+"$ANDROID_HOME/cmake/3.22.1/bin/ctest" --test-dir private/native-tests --output-on-failure
+```
+
+Tests check face winding, texture coordinates, opaque checkerboard pixels, known
+perspective/rotation results, visibility through a full rotation at five aspect
+ratios, and rejection of non-finite or invalid camera inputs.
+
+Loading the locally extracted PES texture is a later step. Its intended in-game
+use is still unknown; it will remain outside the APK and Git.

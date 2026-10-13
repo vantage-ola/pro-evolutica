@@ -7,7 +7,10 @@ The checked Mac has SDK platform 35, Build Tools 34.0.0, NDK 28.2.13676358
 CMake 3.22.1 and the SDL3 3.4.18 AAR are now present. The build targets API 23
 or newer and only `arm64-v8a`.
 
-## Renderer compile
+## Triangle baseline
+
+The following compile commands describe the initial triangle implementation
+(commit `e83ffc9`). The current renderer is the textured cube described below.
 
 Using `NDK` for the installed NDK directory:
 
@@ -110,11 +113,62 @@ confirms `libmain.so` exports `SDL_main` and depends on SDL3, GLESv3 and the C++
 runtime. The inspection report remains under ignored
 `private/native-checks/apk-check.json`.
 
-## Pending device checks
+## Triangle device result
 
-- `adb devices -l` returned 0 with an empty device list. No native app has been
-  installed or launched on the Note20.
-- Triangle appearance, shader compilation, touch/controller input, rotation and
-  background/resume behaviour require the phone check in [ANDROID.md](../ANDROID.md).
-- The cube and local game-texture loading remain unimplemented until this scene
-  is verified.
+The connected Note20 reports model `SM_N981U`, Android 13/API 33 and SoC identifier
+`SM8250`. Our app logs identify Qualcomm Adreno 650 and OpenGL ES 3.2
+`V@0502.0`. The user confirmed the triangle and PS4 X-button tint changes.
+Independent screenshots show the triangle in landscape, and app logs identify
+`PS4 Controller` and corresponding south-button events.
+
+An ADB-injected tap also changes the tint. Home followed by relaunch resumes the
+same process with the triangle still visible; logs record pause/resume. Android
+Back returns to the launcher, with `Finished main function` and `onDestroy()`
+recorded. Evidence stays under ignored `private/device/triangle/`. These checks
+verify the native scene/input path; they do not measure sustained performance.
+
+## Textured cube
+
+The renderer now uses original cube geometry and a generated 64 × 64 RGBA
+checkerboard. It requests a 24-bit depth buffer, uses depth testing and back-face
+culling, and uploads a perspective/rotation matrix. Touch and the PS4 south
+button keep the same tint control. No external texture or game bytes are loaded.
+
+The host CMake build compiles with AppleClang 21, C++17 and warnings as errors.
+The CTest target covers five groups: geometry, texture, projection, visibility
+and invalid inputs. Exact output:
+
+```text
+5 cube checks passed: geometry, texture, projection, visibility, invalid inputs
+1/1 Test #1: cube_data ........................   Passed    0.77 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   0.78 sec
+```
+
+The Android build uses the existing dependencies and `--offline`:
+
+```text
+BUILD SUCCESSFUL in 8s
+36 actionable tasks: 5 executed, 31 up-to-date
+```
+
+The cube APK is 3,848,334 bytes, SHA-256
+`f6849c7dc4b0ada47422f49b8b76befdd306d486fc1dc0d5134b66093d52a0d3`.
+Signature schemes v1/v2 verify; ZIP CRC checks pass. It contains exactly the
+same three native libraries, all AArch64, with no packaged asset files.
+
+ADB installation returned `Success`; launch returned `Status: ok`. GL shader
+compilation/linking and first-frame submission succeeded on the Note20. Captured
+landscape screenshots show the checkerboard mapped onto cube faces and changing
+orientation over time. App logs identify the PS4 controller and show south-button
+and touch tint events in this new build. Home/relaunch logs show pause/resume;
+the same process continues drawing afterward. Screenshots/logs stay under ignored
+`private/device/cube/`.
+
+The first submitted frame reports 1080 × 2308 pixels, followed by landscape
+surface resizing and 2400 × 1080 screenshots. Portrait framing passes CPU tests;
+a persistent portrait view has not been visually captured. Long sessions,
+frame-time measurements, controller reconnection and extracted-image loading
+remain unverified.
