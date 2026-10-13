@@ -82,16 +82,25 @@ their verification checks.
   posed vertices and 19 joints agree with an independent vector/quaternion
   calculation within 1.057e-6 source units. A private CPU diagnostic supports
   residual-first for this model; residual-last badly stretches the geometry.
-  No Blender runtime or in-game pose was compared. Sequence continuity and
-  Android animation remain unverified. See
+  No Blender runtime or in-game pose was compared. Full sampled motion is
+  checked separately below; Android animation remains unverified. See
   [the pose evidence](research/pes2013.md#one-evaluated-pose).
+- `tools/anm_sequence.py` measures inclusive dense ranges, adjacent movement,
+  bounds, triangle areas and duplicate-position/binding gaps. Nineteen original
+  tests check known movement, endpoint differences, quaternion signs, malformed
+  later samples, work limits and CLI/file errors. All 91 selected poses match
+  the separate calculation: 612,976 vertex comparisons and 1,729 joint origins,
+  maximum difference 1.234e-6 source units. No faces collapse; identical bindings
+  remain coincident within 2.238e-16. Fast opening motion agrees with the reference.
+  The first/last geometry differs by up to 1.149206, so automatic looping is
+  unsupported. See [the sequence evidence](research/pes2013.md#full-dense-sequence).
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
-- **382 tests pass** on Python 3.11.9. Commands and results are in
+- **401 tests pass** on Python 3.11.9. Commands and results are in
   [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
 - The phone gameplay report is recorded in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
@@ -164,9 +173,9 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## Next three tasks
 
-1. Check the selected dense sequence against independent poses, including
-   continuity, bounds and residual-first seam behaviour across its samples.
-2. Only after those checks, implement the supported deformation in a portable
-   native module with original fixtures; retain a repeatable reference comparison.
+1. Implement the verified subset in a portable native deformation module, with
+   original fixtures and a repeatable comparison to the checked sampled poses.
+2. Add a bounded local model/clip loading path and elapsed-time sample selection.
+   Hold the final sample; interpolation and looping need separate evidence.
 3. Verify the supported animation on Android before updating the native-engine
    feasibility decision. General gameplay remains out of scope.

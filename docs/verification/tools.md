@@ -13,13 +13,13 @@ Command:
 Exact final output, also saved in [tools-tests.txt](tools-tests.txt):
 
 ```text
-........................................................................ [ 18%]
-........................................................................ [ 37%]
-........................................................................ [ 56%]
-........................................................................ [ 75%]
-........................................................................ [ 94%]
-......................                                                   [100%]
-382 passed in 1.80s
+........................................................................ [ 17%]
+........................................................................ [ 35%]
+........................................................................ [ 53%]
+........................................................................ [ 71%]
+........................................................................ [ 89%]
+.........................................                                [100%]
+401 passed in 1.38s
 ```
 
 The test suite generates two-section PE fixtures in pytest temporary directories.
@@ -87,6 +87,11 @@ reference readers remain outside the test suite.
 The 41 pose tests check original packed rotations, bone transforms and weighted
 geometry. Their cases and the separate real-pose comparison are recorded in
 [Pose evaluation](#pose-evaluation).
+
+The 19 sequence tests check known short motion, sampled ranges, quaternion signs,
+duplicate bindings, geometry collapse, late corruption, work bounds and CLI/file
+errors. The complete real-clip comparison is recorded in
+[Dense sequence check](#dense-sequence-check).
 
 ```bash
 .venv/bin/python -m pip check
@@ -362,7 +367,7 @@ real pose comparison before adding deformation. That next check is recorded belo
 shasum -a 256 private/extracted/pose45.obj
 ```
 
-The full suite returns 0: **382 passed in 1.80s**, Python 3.11.9. Exact output is
+The full suite returns 0: **401 passed in 1.38s**, Python 3.11.9. Exact output is
 in [tools-tests.txt](tools-tests.txt). `tests/test_anm_pose.py` adds 41 original
 tests. They cover a literal packing example, all four omitted quaternion
 components, signed components, known axis rotations, bind recovery for all
@@ -397,8 +402,59 @@ across both choices. See [the detailed interpretation](../research/pes2013.md#on
 Inputs, both OBJs, reference values, source copies, comparison code/output and
 the render remain ignored under `private/`. No dependency was added and no
 game asset or third-party source enters Git/APK. The README and Android app
-are unchanged. Sequence continuity, general animation support, event meaning,
-game materials and Android playback remain unverified.
+are unchanged. The sampled sequence is checked below. General animation support,
+event meaning, game materials and Android playback remain unverified.
+
+## Dense sequence check
+
+```bash
+.venv/bin/python -m pytest -q
+.venv/bin/python tools/anm_sequence.py \
+  --model private/extracted/reduced-model.ktmdl \
+  --animation private/extracted/selected.anm --core-offset 960 --sequence-offset 816 \
+  --weight-order first --json private/reports/sequence-first.json
+```
+
+Both commands return 0. The full suite is **401 passed in 1.38s**, Python 3.11.9;
+[tools-tests.txt](tools-tests.txt) contains the exact output. Nineteen new tests
+use the original two-bone/three-sample fixtures. They check known root movement
+and endpoint distance, stationary hashes, inclusive subranges, a single sample,
+unknown FPS, coincident source points with same/different bindings, zero-area
+faces and local rotation changes. A quaternion sign change counts as the same
+orientation, allowing measured packing drift. Later reserved-bit corruption
+fails the whole run without writing a report. Work caps are checked before any
+pose evaluation. CLI tests check missing/symlink inputs, exclusive reports,
+stdout and direct execution outside the repository.
+
+The real report covers all 91 samples, 0–90, at 30 FPS, with first-to-last duration
+3 seconds. Each frame has 6,736 vertices and 10,079 faces. A separate private
+quaternion/vector calculation over the pinned readers' values checks every frame:
+612,976 vertices and 1,729 joint origins, maximum position error 1.233889e-6
+source units. Triangle lists match exactly. Adjacent maximum vertex/joint movement
+agrees within 1.940458e-7/2.263509e-7. A separate evaluator run reproduces all
+per-sample position hashes. Full outputs and comparison code are in ignored
+`private/research/sequence/`; no reference source is a test dependency.
+
+There are no collapsed faces in 917,189 sampled triangles. The 1,722
+identical-position/binding groups remain coincident within 2.237726e-16.
+Maximum adjacent vertex movement is 0.301164 from sample 3 to 4; the maximum
+local angular step is 33.379384° from 5 to 6. Those faster opening movements
+agree with the reference. First-to-last vertex/joint gaps are 1.149206/0.899220;
+the clip must not be assumed to loop. Sampled bounds and other gaps are in
+[the detailed record](../research/pes2013.md#full-dense-sequence).
+
+A fixed-camera CPU reference render was generated for all 91 samples. A sheet
+of samples 0, 4, 6, 15, 30, 45, 60, 75 and 90 was visually inspected: the body
+remains coherent through the opening movement and raised-arm poses. The existing
+local FFmpeg encoded a 320 × 512 GIF without automatic repeat; FFprobe confirms
+91 frames and 3.03 seconds including the final frame's display time. No new
+dependency was installed. This preview uses flat shading and sampled poses,
+not game materials or native playback. Render code, frames, sheet and GIF stay
+private. Neither Blender nor the game animation runtime was used.
+
+The sequence check supports implementing this subset in a portable native
+module. Interpolation, automatic loops, events, gameplay role and device
+playback still need separate evidence. README and APK remain unchanged.
 
 ## Review and limits
 

@@ -361,3 +361,40 @@ research output and is not ready for the Android viewer's static OBJ loader.
 Output paths must be new and distinct; discard outputs after any failed write.
 No dependencies, app changes or proprietary fixtures are added. See
 [the pose checks](verification/tools.md#pose-evaluation).
+
+## Measure a dense animation sequence
+
+```bash
+.venv/bin/python tools/anm_sequence.py \
+  --model private/extracted/reduced-model.ktmdl \
+  --animation private/extracted/selected.anm --core-offset 960 --sequence-offset 816 \
+  --weight-order first --json private/reports/sequence-first.json
+```
+
+The default range includes every dense sample. Use `--start` and `--end` for an
+inclusive subset. Each sample uses the verified pose evaluator; no interpolation
+or repeated playback is added. A missing sequence header leaves FPS and time
+unknown. The input checks, supported bind/track subset and explicit weight choice
+are the same as for one pose.
+
+The report records each sample's bounds, root origins, minimum triangle area,
+zero-area face count and a SHA-256 of packet-ordered little-endian float64 XYZ
+positions. Adjacent samples report maximum vertex/joint movement and local bone
+rotation change, with the relevant vertex or node. Quaternion sign changes do
+not count as full rotations. The first sample has no previous-step measurement.
+First-to-last vertex/joint distance is separate and does not imply the clip loops.
+
+Duplicate source-position groups measure the largest distance from their first
+vertex. A second grouping requires the same merged bone weights as well; it
+checks coincident bindings across vertices and packets. Distances are anchor
+gaps, not all-pairs diameters. Separate surfaces may share a source position but
+use different weights, so their separation is evidence to inspect, not an
+automatic failure.
+
+Limits: 512 evaluated samples, 2,000,000 vertex-samples and 5,000,000
+triangle-samples, checked before posing. Select a smaller range when necessary.
+Only the first, previous and current geometry are retained; full geometry is
+not written into the report. Output must be new; omit `--json` for stdout.
+The tool reports measurements without an assumed movement threshold or automatic
+smoothness verdict. Keep game reports private. See
+[the full selected-clip check](verification/tools.md#dense-sequence-check).
