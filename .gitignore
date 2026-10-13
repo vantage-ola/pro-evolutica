@@ -1,0 +1,27 @@
+# Local game inputs and research outputs
+games/
+private/
+pro-evo/
+extracted/
+extracted_assets/
+reports/
+logs/
+*.log
+*.exe
+*.dll
+*.iso
+*.apk
+*.obb
+# Python and build products
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.gradle/
+.cxx/
+.DS_Store
+.env
+.env.*
