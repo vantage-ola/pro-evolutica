@@ -5,9 +5,6 @@ Keep game directories outside the repository and reports under `private/`.
 
 ## Setup and tests
 
-The session used a project-local virtual environment after the owner approved
-installation of `pefile` and `pytest`. No global Codex configuration changed.
-
 ```bash
 python3.11 -m venv .venv
 .venv/bin/python -m pip install -r requirements-test.txt
@@ -21,9 +18,8 @@ The installed package metadata identifies `pefile` and `pytest` as MIT licensed.
 
 ## Inspect an executable
 
-Set `GAME_ROOT` to your local game directory. The owner currently keeps PES 2013
-and PES 2015 in a folder named `pro-evo`, outside this repository. Each edition
-has its own subdirectory. Pass the executable path rather than assuming its name.
+Set `GAME_ROOT` to your local game directory. Pass the executable path rather
+than assuming its name.
 
 ```bash
 GAME_ROOT='/path/to/Pro Evolution Soccer 2013'

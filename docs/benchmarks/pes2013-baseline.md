@@ -1,10 +1,9 @@
 # PES 2013: Galaxy Note20 baseline
 
-Status: **not tested on the phone**. The owner plans the first Winlator test for
-14 October 2026 (Africa/Lagos). Local executable inspection is recorded in
-`../STATUS.md`; it is not evidence of a successful boot or gameplay.
+Status: **not tested on the phone**. Executable inspection results are recorded
+in [project status](../STATUS.md).
 
-Target device, supplied by the project specification: Samsung Galaxy Note20,
+Target device: Samsung Galaxy Note20,
 Snapdragon 865+, Adreno 650. Confirm the actual device and Android version during
 the test. Use the local PE report to select a runtime with 32-bit Windows support.
 
@@ -13,7 +12,7 @@ the test. Use the local PE report to select a runtime with 32-bit Windows suppor
 1. Install Winlator from the
    [original releases](https://github.com/brunodev85/winlator/releases), and record
    the version installed. Make your local PES 2013 directory available to its
-   container. The Mac folder path does not identify the phone's storage path.
+   container.
 2. Start with Turnip + DXVK, 800 × 600, low game graphics settings. Record the
    runtime, 32-bit support mode, driver and wrapper versions before launching.
 3. Check menus, kickoff and a full match. Save a screenshot or log if launch fails,

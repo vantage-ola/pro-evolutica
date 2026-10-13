@@ -1,6 +1,6 @@
 # Tool verification
 
-Date: 13 October 2026, Africa/Lagos. Python 3.11.9 on macOS ARM64.
+Test environment: Python 3.11.9 on macOS ARM64.
 
 ## Automated checks
 
@@ -34,22 +34,14 @@ not read the outside file. Both tools refuse to overwrite existing inputs/report
 .venv/bin/python -m pip check
 ```
 
-Result: exit 0, `No broken requirements found.` Pip also warned that its global
-cache was not writable; installation used `--no-cache-dir`. An independent
+Result: exit 0, `No broken requirements found.` An independent
 `importlib.metadata.version` check found **6/6** installed versions equal to
 `requirements-test.txt`.
 
-```bash
-verity validate
-```
+## Read-only smoke tests
 
-Result: exit 0, `OK`. The local proof chains reference the tests and transcript.
-The registry contains no publication or release claim for phone compatibility.
-
-## Read-only smoke tests with owner-supplied files
-
-`GAME_ROOT` was set to each game's discovered directory in the owner's external
-`pro-evo` folder. These inputs are not test dependencies and are not in Git.
+`GAME_ROOT` refers to a local game directory outside the repository.
+Game files are not test dependencies and are not in Git.
 
 ```bash
 .venv/bin/python tools/pe_inspect.py \
@@ -63,7 +55,7 @@ Both commands returned 0. The PE report records x86/PE32, 19,916,288 bytes, 19 D
 descriptors and 330 reported functions. The inventory records 42 files totalling
 6,206,731,485 bytes, `complete: true`, zero errors and zero skipped entries.
 
-The same PE CLI inspected the supplied `PES2015.exe` and returned 0: x86/PE32,
+The same PE CLI inspected `PES2015.exe` and returned 0: x86/PE32,
 39,111,472 bytes, 24 DLL descriptors and 623 reported functions. Both PE reports
 agree with `file` on architecture and with `shasum -a 256` on hashes. Fingerprints
 and the PES 2013 parser warning are recorded in [../STATUS.md](../STATUS.md).
@@ -71,14 +63,7 @@ Raw JSON/CSV reports remain in ignored `private/reports/`.
 
 ## Review and limits
 
-The adversarial pass tested malformed directory sizes and directory replacement
-before accepting the implementation. It found and fixed an unchecked import
-directory size and a possible traversal through a replaced parent symlink. The
-final regressions exercise both failure paths. Reports preserve parser warnings;
-an import list with warnings requires further review.
-
-These results establish the software diagnostics on this Mac. They do not verify
+Reports preserve parser warnings; an import list with warnings requires further
+review. These checks verify the diagnostics on macOS ARM64. They do not verify
 asset formats, extracted assets, REA/Ghidra, Winlator boot, rendering, performance
-or device connectivity. REA health checks remain pending because the checked local
-locations contain no runnable installation. `adb devices` failed to start its
-server inside the sandbox. The phone benchmark fields remain empty.
+or device connectivity. REA health checks and the phone benchmark remain pending.
