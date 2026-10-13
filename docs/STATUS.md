@@ -94,6 +94,14 @@ their verification checks.
   remain coincident within 2.238e-16. Fast opening motion agrees with the reference.
   The first/last geometry differs by up to 1.149206, so automatic looping is
   unsupported. See [the sequence evidence](research/pes2013.md#full-dense-sequence).
+- `native/animation/skeleton.*` evaluates the verified rigid bone transforms and
+  weighted positions in portable C++17. One focused native target covers four
+  original check groups; all six CTest targets pass normally and with sanitizers.
+  Every sampled real vertex agrees with Python within 1.351e-15 and with the
+  separate reference within 1.234e-6 source units. Android ARM64/API 23 compilation
+  passes. No new Python tests were needed. Local loading, sample timing and
+  device animation remain pending. See
+  [the native verification](verification/native-animation.md).
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
@@ -173,9 +181,9 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## Next three tasks
 
-1. Implement the verified subset in a portable native deformation module, with
-   original fixtures and a repeatable comparison to the checked sampled poses.
-2. Add a bounded local model/clip loading path and elapsed-time sample selection.
-   Hold the final sample; interpolation and looping need separate evidence.
+1. Add a bounded local model/clip loading path for the verified native subset;
+   preserve source coordinates, topology and the explicit weight choice.
+2. Add elapsed-time sample selection with focused timing checks. Hold the final
+   sample; interpolation and looping need separate evidence.
 3. Verify the supported animation on Android before updating the native-engine
    feasibility decision. General gameplay remains out of scope.

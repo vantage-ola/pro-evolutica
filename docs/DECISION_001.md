@@ -39,8 +39,10 @@ in the final portrait APK. See [the measured conditions and limitations](verific
 A selected 19-bone model and structurally matching 30 FPS clip now have checked
 metadata. Original pose fixtures and one real-pose comparison now pass, with
 residual-first supported for this sample. The full 91-sample sequence now agrees
-with the separate calculation, including its faster opening motion. Proceed to
-portable native deformation with original tests and reference comparison; the
-clip should hold at its final sample rather than automatically loop. See
+with the separate calculation, including its faster opening motion. The clip
+should hold at its final sample rather than automatically loop. Portable C++
+deformation now passes the original checks and the full sampled comparison.
+Continue with bounded local loading and sample timing before device playback.
+See [the native results](verification/native-animation.md) and
 [the pose evidence and limits](research/pes2013.md#one-evaluated-pose).
 Normal/specular shading remains separate work.

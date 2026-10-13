@@ -3,8 +3,9 @@
 The native app displays one verified PES 2013 ball with its own texture.
 The viewer has a repeatable device measurement baseline. One 19-bone model and
 a structurally matching dense clip now have checked metadata, poses and a full
-sampled sequence. The next target is portable native deformation. Each step
-ends with a result we can inspect and repeat.
+sampled sequence. Portable C++ deformation now agrees with those results. The
+next target is bounded local loading and timed sample selection. Each step ends
+with a result we can inspect and repeat.
 Advance only when its checks pass, or record a specific blocker and change the
 approach. The working Winlator installation remains the route for playing PES.
 
@@ -137,10 +138,14 @@ source units. Adjacent movement, sampled bounds and duplicate bindings are
 checked; no faces collapse. The faster opening frames match the reference.
 First and last poses differ substantially, so the selected clip is not approved
 for automatic looping. See [the full sequence record](research/pes2013.md#full-dense-sequence).
-Proceed to a portable native module with original fixtures and the same reference
-comparison. Add elapsed-time sample selection only after deformation checks pass,
-holding the final sample. Interpolation, looping, events and game-action meaning
-remain separate questions; device playback still needs verification.
+The portable native module now passes four focused original check groups and a
+comparison of all real sampled vertices: maximum difference from Python is
+1.351e-15, and from the separate reference is 1.234e-6 source units. Six native
+targets pass normally and with sanitizers; Android ARM64/API 23 compilation
+passes. See [the native record](verification/native-animation.md).
+Proceed to bounded local loading and elapsed-time sample selection, holding
+the final sample. Interpolation, looping, events and game-action meaning remain
+separate questions; device playback still needs verification.
 
 ## Decide what a native game would require
 

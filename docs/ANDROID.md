@@ -249,9 +249,15 @@ The mesh target checks original known positions, normals, UVs and face indices,
 framing through a full rotation at five aspect ratios, CRLF/comments/exponents,
 unsupported records, malformed faces, finite values, degeneracy, allocation
 limits and regular-file/symlink/FIFO restrictions. It also has a ten-second
-timeout. All five targets pass normally and with address/undefined-behaviour
+timeout. All six targets pass normally and with address/undefined-behaviour
 sanitizers. Device results and asset checksums are in
 [verification/android.md](verification/android.md#static-ball-model).
+
+The new skeleton target has four focused check groups for joint/weight movement,
+parent transforms, packed rotations and invalid inputs. The portable module
+matches all sampled real poses and compiles for Android ARM64/API 23. File
+loading and animation playback are not connected to the renderer yet. See
+[the numerical and compiler checks](verification/native-animation.md).
 
 The earlier grayscale texture's in-game use remains unknown. The selected ball
 and its colour texture now have verified native rendering; all extracted assets
