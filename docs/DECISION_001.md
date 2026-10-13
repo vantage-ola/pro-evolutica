@@ -42,7 +42,11 @@ residual-first supported for this sample. The full 91-sample sequence now agrees
 with the separate calculation, including its faster opening motion. The clip
 should hold at its final sample rather than automatically loop. Portable C++
 deformation now passes the original checks and the full sampled comparison.
-Continue with bounded local loading and sample timing before device playback.
-See [the native results](verification/native-animation.md) and
+Bounded local loading and sample timing now pass, and the clip plays on the
+Note20 with checked endpoint, pause/resume, replay, lifecycle and file fallback
+behaviour. Proceed to the native-engine feasibility decision in PLAN.md before
+choosing a small original playable scope. See
+[the playback results](verification/native-playback.md),
+[the deformation results](verification/native-animation.md) and
 [the pose evidence and limits](research/pes2013.md#one-evaluated-pose).
 Normal/specular shading remains separate work.

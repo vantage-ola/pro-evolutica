@@ -3,8 +3,9 @@
 The native app displays one verified PES 2013 ball with its own texture.
 The viewer has a repeatable device measurement baseline. One 19-bone model and
 a structurally matching dense clip now have checked metadata, poses and a full
-sampled sequence. Portable C++ deformation now agrees with those results. The
-next target is bounded local loading and timed sample selection. Each step ends
+sampled sequence. Portable C++ deformation, bounded local loading and timed playback now agree
+with those results, and the clip plays on the Note20. The next target is a
+native-engine feasibility decision and a small explicit gameplay scope. Each step ends
 with a result we can inspect and repeat.
 Advance only when its checks pass, or record a specific blocker and change the
 approach. The working Winlator installation remains the route for playing PES.
@@ -22,8 +23,9 @@ approach. The working Winlator installation remains the route for playing PES.
   with checked source geometry, visual reference agreement and file fallbacks.
 
 These results establish an asset-loading and rendering path for one static
-model. General model support, animation, gameplay systems and the cause of
-Winlator's stutter remain unverified.
+model. General model support, gameplay systems and the cause of
+Winlator's stutter remain unverified. Animation support is limited to the checked
+rigid model and dense clip.
 See [STATUS.md](STATUS.md) for current evidence and limitations.
 
 ## Find and document one model
@@ -143,9 +145,13 @@ comparison of all real sampled vertices: maximum difference from Python is
 1.351e-15, and from the separate reference is 1.234e-6 source units. Six native
 targets pass normally and with sanitizers; Android ARM64/API 23 compilation
 passes. See [the native record](verification/native-animation.md).
-Proceed to bounded local loading and elapsed-time sample selection, holding
-the final sample. Interpolation, looping, events and game-action meaning remain
-separate questions; device playback still needs verification.
+Bounded local loading and elapsed-time selection now pass focused checks.
+All package-loaded real poses exactly match the verified native output. The
+91-sample clip plays on the Note20, holds its endpoint and passes pause/resume,
+replay, background exclusion and file fallback checks. The user confirms coherent
+motion and PS4 controls. See [the playback record](verification/native-playback.md).
+Interpolation, looping, materials, events and game-action meaning remain
+separate questions. Proceed to the feasibility decision below.
 
 ## Decide what a native game would require
 

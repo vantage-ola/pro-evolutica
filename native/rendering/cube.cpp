@@ -136,7 +136,7 @@ bool Cube::create(std::string& error) {
     return true;
 }
 
-bool Cube::set_mesh(const assets::Mesh& mesh, std::string& error) {
+bool Cube::set_mesh(const assets::Mesh& mesh, std::string& error, bool dynamic) {
     if (mesh.vertices.empty() || mesh.vertices.size() > assets::max_mesh_vertices ||
         mesh.indices.empty() || mesh.indices.size() > assets::max_mesh_indices ||
         mesh.indices.size() % 3 || !std::isfinite(mesh.radius) || mesh.radius < 1e-6f) {
@@ -157,7 +157,7 @@ bool Cube::set_mesh(const assets::Mesh& mesh, std::string& error) {
     glGenBuffers(1, &vertices);
     glBindBuffer(GL_ARRAY_BUFFER, vertices);
     glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(assets::MeshVertex),
-                 mesh.vertices.data(), GL_STATIC_DRAW);
+                 mesh.vertices.data(), dynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
     glGenBuffers(1, &indices);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(std::uint16_t),
@@ -188,6 +188,22 @@ bool Cube::set_mesh(const assets::Mesh& mesh, std::string& error) {
     scale_ = 1.0f / mesh.radius;
     index_count_ = static_cast<GLsizei>(mesh.indices.size());
     mesh_ = true;
+    vertex_count_ = mesh.vertices.size();
+    return true;
+}
+
+bool Cube::update_vertices(const std::vector<assets::MeshVertex>& vertices, std::string& error) {
+    if (!mesh_ || vertices.size()!=vertex_count_) {
+        error="Animation vertex count changed";
+        return false;
+    }
+    glBindBuffer(GL_ARRAY_BUFFER,vertices_);
+    glBufferSubData(GL_ARRAY_BUFFER,0,vertices.size()*sizeof(assets::MeshVertex),vertices.data());
+    const auto status=glGetError();
+    if (status!=GL_NO_ERROR) {
+        error="Cannot update animation vertices; GL="+std::to_string(status);
+        return false;
+    }
     return true;
 }
 
@@ -262,5 +278,6 @@ void Cube::destroy() {
     centre_ = {};
     scale_ = 1;
     mesh_ = false;
+    vertex_count_ = 0;
     index_count_ = 36;
 }

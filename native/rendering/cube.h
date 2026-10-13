@@ -11,7 +11,8 @@ class Cube {
 public:
     bool create(std::string& error);
     bool set_texture(const assets::Image& image, std::string& error);
-    bool set_mesh(const assets::Mesh& mesh, std::string& error);
+    bool set_mesh(const assets::Mesh& mesh, std::string& error, bool dynamic = false);
+    bool update_vertices(const std::vector<assets::MeshVertex>& vertices, std::string& error);
     void draw(int width, int height, int colour, float angle, const camera::View& view);
     void destroy();
 
@@ -30,5 +31,6 @@ private:
     std::array<float, 3> centre_{};
     float scale_ = 1;
     bool mesh_ = false;
+    std::size_t vertex_count_ = 0;
     GLsizei index_count_ = 36;
 };

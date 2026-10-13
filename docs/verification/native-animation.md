@@ -2,8 +2,8 @@
 
 The C++ module in `native/animation/skeleton.h` and `.cpp` now evaluates the
 verified rigid skeletal subset and deforms vertex positions. It has no SDL,
-OpenGL, Android or file-system dependency. The app still displays the static
-ball; model/clip loading and timed playback are the next implementation.
+OpenGL, Android or file-system dependency. The original deformation result is recorded here. Local loading, timed playback
+and the subsequent Note20 result are in [the playback record](native-playback.md).
 
 ## Behaviour
 
@@ -87,7 +87,8 @@ file private/research/native-skeleton/skeleton-android-arm64.o
 ```
 
 Compilation returns 0; `file` reports an ELF 64-bit little-endian relocatable
-ARM aarch64 object. No dependency was installed. README, renderer and APK are
-unchanged, and no game data enters Git. Proceed to a bounded local loading path
-and elapsed-time sample selection, holding the final sample; verify those before
-device playback. Interpolation and automatic looping remain unsupported.
+ARM aarch64 object. No dependency was installed. For this deformation-only step,
+README, renderer and APK were unchanged, and no game data enters Git. The
+subsequent bounded loading and sample-selection implementation holds the final
+sample and now passes device playback checks; see the linked playback
+record. Interpolation and automatic looping remain unsupported.

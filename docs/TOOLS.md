@@ -398,3 +398,28 @@ not written into the report. Output must be new; omit `--json` for stdout.
 The tool reports measurements without an assumed movement threshold or automatic
 smoothness verdict. Keep game reports private. See
 [the full selected-clip check](verification/tools.md#dense-sequence-check).
+
+## Export a local native animation
+
+```bash
+.venv/bin/python tools/animation_export.py \
+  --model private/extracted/reduced-model.ktmdl \
+  --animation private/extracted/selected.anm --core-offset 960 --sequence-offset 816 \
+  --weight-order first --output private/extracted/animation.pva \
+  --json private/reports/native-animation.json
+```
+
+Use new output paths. The exporter validates every dense pose, maps packet bone
+palettes, resolves the explicitly selected residual-weight order and merges
+triangle lists without changing source coordinates or winding. It requires a
+sequence with known integer FPS. It retains packed rotations and optional
+translations; a fixed bound encloses the bind pose and every sampled pose.
+The report identifies input/output hashes, counts, duration and weight choice.
+
+`PEVA0001` is our viewer format, not a PES format. It contains geometry, rigid
+binds and dense samples. Materials, UVs, original normals, events, morphs,
+interpolation and automatic looping are excluded. Limits match the native
+reader: 32 MiB, 128 bones, 65,535 vertices, 600,000 triangle-list indices,
+512 samples, two million vertex-samples and 1–240 FPS. Keep packages and reports
+under ignored `private/`. Discard outputs after any failed write. See
+[loading and controls](ANDROID.md#load-a-local-animation).

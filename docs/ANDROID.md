@@ -1,8 +1,8 @@
 # Native Android test scene
 
 The triangle established rendering and input on the Note20. The viewer now
-loads one checked static mesh and its PNG from local app storage. The selected
-PES 2013 ball has been rendered on the Note20 with its colour texture. The
+loads a checked static mesh/PNG or a supported skeletal model/clip from local
+app storage. The selected PES 2013 ball has been rendered on the Note20 with its colour texture. The
 original rotating cube remains available when no supported mesh is supplied.
 Both scenes use OpenGL ES 3, depth testing, back-face culling and perspective.
 The mesh has simple directional lighting; the cube keeps its per-face shading.
@@ -207,7 +207,8 @@ Mesh positions, normals and UVs remain unchanged in the reader. Centre/radius
 are computed for framing; the renderer recentres and scales uniformly. The
 checked KTMDL UVs address the top-first PNG directly; the original cube's UVs
 retain their earlier vertical flip. This is not a general OBJ material viewer.
-Normal/specular maps, proprietary shaders, skinning and animation are unsupported.
+Normal/specular maps and proprietary shaders are unsupported. Skeletal playback
+uses the separate local format below.
 
 Missing/damaged `model.obj` uses the cube and its existing `texture.png` path.
 A valid mesh with missing/damaged `model.png` uses the original checkerboard on
@@ -249,16 +250,56 @@ The mesh target checks original known positions, normals, UVs and face indices,
 framing through a full rotation at five aspect ratios, CRLF/comments/exponents,
 unsupported records, malformed faces, finite values, degeneracy, allocation
 limits and regular-file/symlink/FIFO restrictions. It also has a ten-second
-timeout. All six targets pass normally and with address/undefined-behaviour
+timeout. All seven targets pass normally and with address/undefined-behaviour
 sanitizers. Device results and asset checksums are in
 [verification/android.md](verification/android.md#static-ball-model).
 
 The new skeleton target has four focused check groups for joint/weight movement,
 parent transforms, packed rotations and invalid inputs. The portable module
-matches all sampled real poses and compiles for Android ARM64/API 23. File
-loading and animation playback are not connected to the renderer yet. See
-[the numerical and compiler checks](verification/native-animation.md).
+matches all sampled real poses and compiles for Android ARM64/API 23. The separate clip target checks package validation, sample timing and
+regular-file restrictions. Loading and dense playback now connect to the renderer. See
+[the deformation checks](verification/native-animation.md) and
+[the playback record](verification/native-playback.md).
 
 The earlier grayscale texture's in-game use remains unknown. The selected ball
 and its colour texture now have verified native rendering; all extracted assets
 remain outside the APK and Git.
+
+## Load a local animation
+
+Export a package with [the native animation exporter](TOOLS.md#export-a-local-native-animation).
+With the debug APK installed and one authorised phone:
+
+```bash
+adb shell run-as com.proevolutica.viewer mkdir -p files
+adb shell -T run-as com.proevolutica.viewer tee files/animation.pva \
+  < private/extracted/animation.pva > /dev/null
+adb shell run-as com.proevolutica.viewer sha256sum files/animation.pva
+shasum -a 256 private/extracted/animation.pva
+adb shell am force-stop com.proevolutica.viewer
+adb shell am start -n com.proevolutica.viewer/.ViewerActivity
+```
+
+Compare the hashes. A valid `animation.pva` takes precedence over the static
+scene. Missing or malformed packages log the reason and use the existing
+`model.obj`/cube path. To return to the ball, remove only `files/animation.pva`
+with `run-as` and restart. No package enters the APK.
+
+Playback starts at sample zero and selects integer samples from elapsed
+foreground playing time. It holds the last sample. Options/Space pauses or
+resumes; at the endpoint it restarts from zero. Triangle/R or touch hold/release
+rewinds to zero and resets the camera/tint, paused. Camera movement also pauses
+playback. Background time is excluded. Touch tap/PS4 X still changes tint;
+orbit and zoom still work. No automatic looping or interpolation is applied.
+
+The reader validates the complete bounded file before accepting it, including
+all rotations, rigid binds, weights, indices and every pose's framing. Symlinks,
+special files and files changed during reading are refused. The geometry uses
+white directional lighting with normals computed from each pose's triangles;
+this does not reproduce game materials. Vertex data updates only when the
+selected sample changes, while topology and framing stay fixed.
+
+The existing B benchmark measures static scenes and refuses animation scenes.
+Do not interpret the static ball's FPS as an animation or gameplay result.
+Device evidence and remaining limits are in
+[the playback record](verification/native-playback.md).

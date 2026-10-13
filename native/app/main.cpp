@@ -3,6 +3,8 @@
 
 #include "../rendering/cube.h"
 #include "../diagnostics/frame_stats.h"
+#include "../animation/clip.h"
+#include <memory>
 #include <atomic>
 #include <algorithm>
 #include <cmath>
@@ -20,6 +22,9 @@ struct App {
     SDL_GLContext context = nullptr;
     SDL_Gamepad* gamepad = nullptr;
     Cube cube;
+    std::unique_ptr<animation::Clip> clip;
+    std::unique_ptr<animation::Playback> playback;
+    std::size_t uploaded_sample = 0;
     camera::View view;
     camera::Touch touch;
     diagnostics::Capture capture;
@@ -52,6 +57,7 @@ bool SDLCALL lifecycle(void* userdata, SDL_Event* event) {
         app.active = false;
         return false;
     case SDL_EVENT_DID_ENTER_FOREGROUND:
+        app.clear_touch = true;
         app.active = true;
         return false;
     default:
@@ -65,8 +71,13 @@ void change_colour(App& app, const char* input) {
 }
 
 void pause_rotation(App& app) {
-    app.paused = !app.paused;
-    SDL_Log("Rotation %s; angle=%.9g", app.paused ? "paused" : "resumed", app.angle);
+    if (app.playback && app.playback->ended()) {
+        app.playback->rewind();
+        app.paused = false;
+    } else app.paused = !app.paused;
+    if (app.playback)
+        SDL_Log("Animation %s; sample=%zu",app.paused ? "paused" : "playing",app.playback->sample());
+    else SDL_Log("Rotation %s; angle=%.9g", app.paused ? "paused" : "resumed", app.angle);
 }
 
 void camera_log(App& app, const char* input) {
@@ -76,10 +87,14 @@ void camera_log(App& app, const char* input) {
 
 void reset_view(App& app) {
     app.view.reset();
-    app.angle = .6f;
+    app.angle = app.clip ? 0.f : .6f;
+    if (app.playback) {
+        app.playback->rewind();
+        SDL_Log("Animation reset; sample=0; paused");
+    }
     app.paused = true;
     app.colour = 0;
-    camera_log(app, "reset (rotation paused)");
+    camera_log(app, "reset (motion paused)");
 }
 
 void touch_input(App& app, const SDL_TouchFingerEvent& event) {
@@ -133,6 +148,10 @@ void cancel_capture(App& app, const char* reason) {
 }
 
 void begin_capture(App& app) {
+    if (app.clip) {
+        SDL_Log("Benchmark: static scenes only; remove animation.pva and restart for the ball benchmark");
+        return;
+    }
     if (app.capture.active()) { cancel_capture(app,"B pressed again"); return; }
     try {
         for (const char* file : {"benchmark.json","benchmark-frames.csv"}) {
@@ -203,6 +222,49 @@ void save_capture(App& app) {
     } catch (const std::exception& error) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Benchmark report: %s",error.what());
     }
+}
+
+bool load_animation(App& app) {
+    const char* directory=SDL_GetAndroidInternalStoragePath();
+    if (!directory) return false;
+    bool uploaded=false;
+    try {
+        const auto start=SDL_GetTicksNS();
+        auto clip=std::make_unique<animation::Clip>(animation::load_clip(std::string(directory)+"/animation.pva"));
+        const auto mesh=clip->mesh(0);
+        auto playback=std::make_unique<animation::Playback>(clip->samples.size(),clip->fps);
+        const auto upload=SDL_GetTicksNS();
+        std::string error;
+        if (!app.cube.set_mesh(mesh,error,true)) throw std::runtime_error(error);
+        uploaded=true;
+        const assets::Image white{1,1,{255,255,255,255}};
+        if (!app.cube.set_texture(white,error)) throw std::runtime_error(error);
+        app.mesh_read_ms=double(upload-start)/1e6;
+        app.mesh_upload_ms=double(SDL_GetTicksNS()-upload)/1e6;
+        app.mesh_loaded=true;
+        app.mesh_vertices=mesh.vertices.size();app.mesh_triangles=mesh.indices.size()/3;
+        app.angle=0;
+        SDL_Log("Animation loaded: %zu bones, %zu vertices, %zu triangles, %zu samples at %u fps; final sample held",
+            clip->samples[0].size(),mesh.vertices.size(),mesh.indices.size()/3,clip->samples.size(),clip->fps);
+        app.clip=std::move(clip);
+        app.playback=std::move(playback);
+        return true;
+    } catch (const std::system_error& e) {
+        if (e.code().value()==ENOENT) SDL_Log("Animation: no animation.pva; using static scene");
+        else SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Animation: %s; using static scene",e.what());
+    } catch (const std::exception& e) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Animation: %s; using static scene",e.what());
+    }
+    if (uploaded) {
+        // Restore the original fallback scene after a partial GL upload.
+        app.cube.destroy();
+        std::string error;
+        if (!app.cube.create(error)) {
+            SDL_SetError("%s",error.c_str());
+            app.running=false;
+        }
+    }
+    return false;
 }
 
 void load_mesh(App& app) {
@@ -290,8 +352,11 @@ bool create(App& app) {
         SDL_SetError("%s", error.c_str());
         return false;
     }
-    load_mesh(app);
-    load_texture(app);
+    if (!load_animation(app)) {
+        if (!app.running) return false;
+        load_mesh(app);
+        load_texture(app);
+    }
     int count = 0;
     SDL_JoystickID* gamepads = SDL_GetGamepads(&count);
     if (gamepads && count > 0) {
@@ -301,7 +366,7 @@ bool create(App& app) {
     }
     SDL_free(gamepads);
     SDL_Log("Benchmark: keyboard B starts 5s warmup + 60s capture; input/background/resize cancels");
-    SDL_Log("Controls: drag orbit; pinch zoom; hold/release reset; PS4 left stick orbit, right stick Y zoom, Triangle reset, X tint, Options rotation");
+    SDL_Log("Controls: drag orbit; pinch zoom; hold/release reset; PS4 left stick orbit, right stick Y zoom, Triangle reset, X tint, Options %s",app.clip ? "play/pause/replay" : "rotation");
     return true;
 }
 
@@ -395,9 +460,22 @@ int main(int, char**) {
     Uint64 previous = SDL_GetTicksNS();
     int result = 0;
     while (app.running) {
-        if (app.clear_touch.exchange(false)) {
+        const Uint64 now = SDL_GetTicksNS();
+        const bool background_transition=app.clear_touch.exchange(false);
+        if (background_transition) {
             app.touch.cancel();
             cancel_capture(app,"background");
+        }
+        const auto delta=now-previous;
+        previous=now;
+        // Advance the preceding interval before applying this frame's inputs.
+        // Background transitions and the first frame do not consume clip time.
+        if (app.playback && !first_frame && app.active && !background_transition && !app.paused) {
+            app.playback->advance(delta);
+            if (app.playback->ended()) {
+                app.paused=true;
+                SDL_Log("Animation ended; sample=%zu; held",app.playback->sample());
+            }
         }
         SDL_Event event;
         while (SDL_PollEvent(&event)) handle_input(app, event);
@@ -417,11 +495,21 @@ int main(int, char**) {
             SDL_Delay(20);
             continue;
         }
-        const Uint64 now = SDL_GetTicksNS();
-        const float elapsed = std::min(.1f, float(now - previous) / 1'000'000'000.0f);
-        previous = now;
+        const float elapsed = std::min(.1f, float(delta) / 1'000'000'000.0f);
         gamepad_camera(app,elapsed);
-        if (!app.paused) app.angle = std::fmod(app.angle + elapsed * .65f, 6.28318530718f);
+        if (app.clip && app.uploaded_sample!=app.playback->sample()) {
+            try {
+                const auto mesh=app.clip->mesh(app.playback->sample());
+                std::string error;
+                if (!app.cube.update_vertices(mesh.vertices,error)) throw std::runtime_error(error);
+                app.uploaded_sample=app.playback->sample();
+            } catch (const std::exception& e) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Animation frame: %s",e.what());
+                result=1;
+                break;
+            }
+        }
+        if (!app.clip && !app.paused) app.angle = std::fmod(app.angle + elapsed * .65f, 6.28318530718f);
         const bool measuring = app.capture.active();
         const auto submit_begin = measuring ? SDL_GetTicksNS() : 0;
         app.cube.draw(width, height, app.colour, app.angle, app.view);
@@ -438,7 +526,8 @@ int main(int, char**) {
             app.first_frame_ms = double(swap_end-app.main_begin)/1e6;
             SDL_Log("Startup ms: mesh read=%.3f upload=%.3f; image read=%.3f upload=%.3f; create=%.3f main-to-first-swap=%.3f",
                 app.mesh_read_ms,app.mesh_upload_ms,app.image_read_ms,app.image_upload_ms,app.create_ms,app.first_frame_ms);
-            SDL_Log("Textured %s frame submitted: %dx%d", app.mesh_loaded ? "mesh" : "cube", width, height);
+            if (app.clip) SDL_Log("Animated mesh frame submitted: %dx%d; sample=%zu",width,height,app.uploaded_sample);
+            else SDL_Log("Textured %s frame submitted: %dx%d", app.mesh_loaded ? "mesh" : "cube", width, height);
             first_frame = false;
         }
         if (!app.vsync) SDL_Delay(16);

@@ -2,7 +2,8 @@
 
 PES 2013 runs in Winlator: peak 60 FPS, with choppy gameplay throughout the match.
 Repeated menu effects remain unresolved. The separate native viewer now renders
-one checked PES 2013 ball with its colour texture. See [DECISION_001.md](DECISION_001.md)
+one checked PES 2013 ball with its colour texture and plays one verified dense
+skeletal clip from local storage. See [DECISION_001.md](DECISION_001.md)
 for the development direction and [PLAN.md](PLAN.md) for the next results and
 their verification checks.
 
@@ -83,7 +84,7 @@ their verification checks.
   calculation within 1.057e-6 source units. A private CPU diagnostic supports
   residual-first for this model; residual-last badly stretches the geometry.
   No Blender runtime or in-game pose was compared. Full sampled motion is
-  checked separately below; Android animation remains unverified. See
+  checked separately below; device playback is now verified in the native record. See
   [the pose evidence](research/pes2013.md#one-evaluated-pose).
 - `tools/anm_sequence.py` measures inclusive dense ranges, adjacent movement,
   bounds, triangle areas and duplicate-position/binding gaps. Nineteen original
@@ -99,8 +100,8 @@ their verification checks.
   original check groups; all six CTest targets pass normally and with sanitizers.
   Every sampled real vertex agrees with Python within 1.351e-15 and with the
   separate reference within 1.234e-6 source units. Android ARM64/API 23 compilation
-  passes. No new Python tests were needed. Local loading, sample timing and
-  device animation remain pending. See
+  passes. No new Python tests were needed for deformation. Local loading and
+  device playback are checked separately below. See
   [the native verification](verification/native-animation.md).
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
@@ -108,11 +109,23 @@ their verification checks.
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
-- **401 tests pass** on Python 3.11.9. Commands and results are in
-  [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
+- **404 tests pass** on Python 3.11.9. Earlier tool results are in
+  [verification/tools.md](verification/tools.md), and the latest exporter result
+  is in [verification/native-playback.md](verification/native-playback.md).
+  Usage is in [TOOLS.md](TOOLS.md).
 - The phone gameplay report is recorded in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
   60 FPS is a peak reading, not a measured sustained average.
+- `tools/animation_export.py` and `native/animation/clip.*` provide bounded local
+  loading and elapsed-time dense playback. All 612,976 package-loaded positions
+  exactly match the verified native bridge. Three focused Python tests and one
+  native target cover format validation and timing; 404 Python tests and all
+  seven native targets pass, including sanitizers. The ARM64 APK builds offline
+  and plays the 91-sample clip on the Note20. Pause/resume, final hold, replay,
+  background exclusion and missing/malformed fallback pass. The user confirms
+  coherent motion and PS4 Options/Triangle; portrait/landscape screenshots are
+  saved privately. Geometry uses simple white lighting. No game files enter the
+  APK or Git. See [the playback record](verification/native-playback.md).
 
 ## Local game observations
 
@@ -181,9 +194,9 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## Next three tasks
 
-1. Add a bounded local model/clip loading path for the verified native subset;
-   preserve source coordinates, topology and the explicit weight choice.
-2. Add elapsed-time sample selection with focused timing checks. Hold the final
-   sample; interpolation and looping need separate evidence.
-3. Verify the supported animation on Android before updating the native-engine
-   feasibility decision. General gameplay remains out of scope.
+1. Update the native-engine feasibility decision using the verified viewer and
+   animation results, with explicit gaps in gameplay support.
+2. Define one small original playable interaction before adding player control,
+   ball physics or animation transitions. Do not infer the proprietary behaviour.
+3. Measure animation frame times/memory when needed for performance work; the
+   existing static ball baseline does not establish animation performance.
