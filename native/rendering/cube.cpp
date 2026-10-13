@@ -2,20 +2,27 @@
 #include "cube_data.h"
 
 #include <cstddef>
+#include <cmath>
 
 namespace {
 constexpr const char* vertex_source = R"(#version 300 es
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec2 uv;
-layout(location = 2) in float light;
+layout(location = 2) in vec3 normal;
 uniform mat4 transform;
+uniform mat4 rotation;
+uniform bool mesh_mode;
+uniform vec3 centre;
+uniform float scale;
 out vec2 texture_uv;
 out float face_light;
 void main() {
-    gl_Position = transform * vec4(position, 1.0);
-    // Images store the top row first; cube UVs put v=0 at the bottom.
-    texture_uv = vec2(uv.x, 1.0 - uv.y);
-    face_light = light;
+    gl_Position = transform * vec4((position - centre) * scale, 1.0);
+    // The extracted mesh retains top-first source UVs; the original cube uses
+    // bottom-first UVs. No image bytes are flipped or changed.
+    texture_uv = mesh_mode ? uv : vec2(uv.x, 1.0 - uv.y);
+    face_light = mesh_mode ? 0.3 + 0.7 * max(dot(mat3(rotation) * normalize(normal),
+        normalize(vec3(0.4, 0.7, 1.0))), 0.0) : normal.x;
 }
 )";
 constexpr const char* fragment_source = R"(#version 300 es
@@ -80,6 +87,10 @@ bool Cube::create(std::string& error) {
     }
     transform_ = glGetUniformLocation(program_, "transform");
     tint_ = glGetUniformLocation(program_, "tint");
+    rotation_ = glGetUniformLocation(program_, "rotation");
+    mesh_mode_ = glGetUniformLocation(program_, "mesh_mode");
+    centre_uniform_ = glGetUniformLocation(program_, "centre");
+    scale_uniform_ = glGetUniformLocation(program_, "scale");
     const GLint image = glGetUniformLocation(program_, "image");
     glGenVertexArrays(1, &array_);
     glBindVertexArray(array_);
@@ -113,12 +124,70 @@ bool Cube::create(std::string& error) {
     glUniform1i(image, 0);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CCW);
+    glCullFace(GL_BACK);
     if (glGetError() != GL_NO_ERROR || transform_ < 0 || tint_ < 0 || image < 0 ||
+        rotation_ < 0 || mesh_mode_ < 0 || centre_uniform_ < 0 || scale_uniform_ < 0 ||
         !array_ || !vertices_ || !indices_ || !texture_) {
         error = "Cannot initialise cube buffers, texture or uniforms";
         destroy();
         return false;
     }
+    return true;
+}
+
+bool Cube::set_mesh(const assets::Mesh& mesh, std::string& error) {
+    if (mesh.vertices.empty() || mesh.vertices.size() > assets::max_mesh_vertices ||
+        mesh.indices.empty() || mesh.indices.size() > assets::max_mesh_indices ||
+        mesh.indices.size() % 3 || !std::isfinite(mesh.radius) || mesh.radius < 1e-6f) {
+        error = "Invalid mesh counts or radius";
+        return false;
+    }
+    for (const auto x : mesh.centre) if (!std::isfinite(x)) {
+        error = "Invalid mesh centre";
+        return false;
+    }
+    for (const auto index : mesh.indices) if (index >= mesh.vertices.size()) {
+        error = "Invalid mesh index";
+        return false;
+    }
+    GLuint array = 0, vertices = 0, indices = 0;
+    glGenVertexArrays(1, &array);
+    glBindVertexArray(array);
+    glGenBuffers(1, &vertices);
+    glBindBuffer(GL_ARRAY_BUFFER, vertices);
+    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(assets::MeshVertex),
+                 mesh.vertices.data(), GL_STATIC_DRAW);
+    glGenBuffers(1, &indices);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.size() * sizeof(std::uint16_t),
+                 mesh.indices.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(assets::MeshVertex), nullptr);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(assets::MeshVertex),
+                          reinterpret_cast<const void*>(offsetof(assets::MeshVertex, u)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(assets::MeshVertex),
+                          reinterpret_cast<const void*>(offsetof(assets::MeshVertex, nx)));
+    glEnableVertexAttribArray(2);
+    glBindVertexArray(0);
+    const GLenum status = glGetError();
+    if (!array || !vertices || !indices || status != GL_NO_ERROR) {
+        while (glGetError() != GL_NO_ERROR) {}
+        if (array) glDeleteVertexArrays(1, &array);
+        if (vertices) glDeleteBuffers(1, &vertices);
+        if (indices) glDeleteBuffers(1, &indices);
+        error = "Cannot upload mesh; GL=" + std::to_string(status);
+        return false;
+    }
+    glDeleteVertexArrays(1, &array_);
+    glDeleteBuffers(1, &vertices_);
+    glDeleteBuffers(1, &indices_);
+    array_ = array; vertices_ = vertices; indices_ = indices;
+    centre_ = mesh.centre;
+    scale_ = 1.0f / mesh.radius;
+    index_count_ = static_cast<GLsizei>(mesh.indices.size());
+    mesh_ = true;
     return true;
 }
 
@@ -168,13 +237,18 @@ void Cube::draw(int width, int height, int colour, float angle) {
     glUseProgram(program_);
     const auto transform = cube_data::transform(angle, float(width) / float(height));
     glUniformMatrix4fv(transform_, 1, GL_FALSE, transform.data());
+    const auto rotation = cube_data::rotation(angle);
+    glUniformMatrix4fv(rotation_, 1, GL_FALSE, rotation.data());
+    glUniform1i(mesh_mode_, mesh_);
+    glUniform3fv(centre_uniform_, 1, centre_.data());
+    glUniform1f(scale_uniform_, scale_);
     constexpr float tints[][3] = {{1, 1, 1}, {1, 0.35f, 0.35f}, {0.35f, 1, 0.35f}};
     const auto& tint = tints[colour % 3];
     glUniform3fv(tint_, 1, tint);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture_);
     glBindVertexArray(array_);
-    glDrawElements(GL_TRIANGLES, cube_data::indices.size(), GL_UNSIGNED_SHORT, nullptr);
+    glDrawElements(GL_TRIANGLES, index_count_, GL_UNSIGNED_SHORT, nullptr);
     glBindVertexArray(0);
 }
 
@@ -185,4 +259,8 @@ void Cube::destroy() {
     if (indices_) glDeleteBuffers(1, &indices_);
     if (texture_) glDeleteTextures(1, &texture_);
     vertices_ = array_ = program_ = indices_ = texture_ = 0;
+    centre_ = {};
+    scale_ = 1;
+    mesh_ = false;
+    index_count_ = 36;
 }

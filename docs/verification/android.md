@@ -10,7 +10,8 @@ or newer and only `arm64-v8a`.
 ## Triangle baseline
 
 The following compile commands describe the initial triangle implementation
-(commit `e83ffc9`). The current renderer is the textured cube described below.
+(commit `e83ffc9`). The current viewer loads the static ball described below,
+with the textured cube as its fallback scene.
 
 Using `NDK` for the installed NDK directory:
 
@@ -241,3 +242,116 @@ south-button events were verified in the preceding cube build, but have not
 been observed in this extracted-texture run. This verifies one texture in our
 native renderer; its in-game use, meshes and sustained rendering performance
 remain unknown.
+
+## Static ball model
+
+`native/assets/mesh.cpp` reads the static export subset without SDL, OpenGL or
+external material dependencies. The renderer replaces its buffers only after
+a valid upload, preserving the cube on reader/upload failure. It frames the
+model using its computed centre/radius, retains source UVs, uses simple
+directional vertex lighting and draws CCW triangles with back-face culling and
+depth testing. The colour image is supplied separately as `files/model.png`.
+Neither the mesh nor image is packaged in the APK.
+
+The existing CMake commands in [ANDROID.md](../ANDROID.md#cpu-tests) configure
+and build all three host targets with C++17 and warnings as errors. CTest output:
+
+```text
+5 cube checks passed: geometry, texture, projection, visibility, invalid inputs
+167 PNG checks passed: pixels, filters, CRC, bounds, zlib, ordering, files
+1496 mesh checks passed: geometry, framing, format, bounds, files
+100% tests passed, 0 tests failed out of 3
+Total Test time (real) =   2.97 sec
+```
+
+The new mesh target uses an original translated plane with known positions,
+UVs, normals, two face indices and centre/radius. Of its assertions, 1,440 check
+framing through a full rotation at five aspect ratios. Format checks include
+CRLF/comments/exponents, missing attributes, unsupported records, malformed or
+mismatched indices, non-finite/excessive values, zero normals/areas and allocation
+caps. File checks reject missing inputs, directories, symlinks, FIFOs and an
+oversized sparse file. The same three targets pass with AddressSanitizer and
+UndefinedBehaviorSanitizer: 5.48 seconds, with no sanitizer diagnostics.
+
+A separate sanitizer-enabled host program reads the real OBJ. Comparing its
+vertex and triangle buffers against the pinned independent reader's data
+packed as little-endian float32/uint16 gives exact bytes:
+
+- 682 vertices, 21,824 bytes; CRC32 `d6f59e22`, SHA-256
+  `01932e8cd850ad565123ec4651c23aef5ce39e0a70d8d0144b03a396aebcf7aa`.
+- 1,144 triangles, 6,864 bytes; CRC32 `c65c6063`, SHA-256
+  `984c4558d4d846db67734f028daac75942ddccb40decd2a181ca36c97262f537`.
+- Centre `(0,0,0)`, radius `0.110000595` in source units. The reader preserves
+  positions; recentering/uniform scaling happen only in the renderer.
+
+The offline APK build uses the existing toolchain and cache:
+
+```bash
+export GRADLE_USER_HOME="$PWD/private/gradle"
+./android/gradlew -p android --offline --no-daemon :app:assembleDebug
+```
+
+```text
+BUILD SUCCESSFUL in 11s
+36 actionable tasks: 5 executed, 31 up-to-date
+```
+
+APK size is 3,964,886 bytes; SHA-256:
+`4b1d833ffdca51c399243518f0b98c0851b3cf663263bee6e5440f91d114045a`.
+Signature schemes v1/v2 and all ZIP CRCs verify. The three native libraries are
+ELF64 little-endian AArch64, with no `assets/` entries. An exact-byte scan of every
+unpacked ZIP entry found neither the supplied OBJ nor PNG. The inspection report
+is saved privately as `private/native-checks/mesh-apk-check.json`.
+
+### Note20 checks
+
+ADB installation returns `Success`. The Note20 still reports Android 13/API 33,
+Adreno 650 and OpenGL ES 3.2 `V@0502.0`. The app logs:
+
+```text
+Mesh loaded: 682 vertices, 1144 triangles; centre=(0,0,0); radius=0.110000595
+Mesh CRC32: vertices=d6f59e22; indices=c65c6063
+Texture loaded: 512x512 RGBA8; pixels CRC32=643dc8d1
+Textured mesh frame submitted: 2308x1017
+```
+
+Both supplied file hashes match the local outputs in
+[the research record](../research/pes2013.md#static-ball-geometry-and-textures).
+An initial `adb exec-in` transfer truncated the 114,904-byte OBJ to 14,334 bytes.
+The reader refused it. Repeating with `adb shell -T`, then checking the device
+SHA-256, supplied the complete file. Usage instructions now use that protocol.
+The failed transfer is retained as private diagnostic evidence, not counted as
+a successful mesh test.
+
+Device results:
+
+- Missing and original malformed `model.obj` leave the existing cube/texture
+  working, with explanatory logs and screenshots.
+- The complete model without `model.png` renders the ball with the original
+  checkerboard. An original malformed PNG logs `Invalid PNG signature` and
+  retains that checkerboard on the mesh. Both cases were repeated after the
+  model transfer was fixed.
+- The checked colour PNG renders blue/yellow panels, white areas and readable
+  markings on the ball. A separate Python CPU rasteriser used the independent
+  reader's vertices/faces and macOS-decoded DDS pixels, at the paused angle
+  `0.607889533`. Its silhouette, panel boundaries and logo placement agree
+  visually with the device screenshot. This is a qualitative comparison, not
+  pixel equality: the reference uses a different resolution and level-zero
+  bilinear sampling, while the GPU uses generated mipmaps.
+- Touch tint events and PS4 south-button tint events appear in this build's
+  logs. Manual PS4 checks confirm X changes tint and Options pauses/resumes
+  rotation. Pause/resume events also appear in the logs; an ADB Space key
+  independently pauses rotation for comparison.
+- Home/relaunch returns to the same process, with pause/resume logs and the ball
+  still rendered. Android Back logs `Finished main function` and closes the app;
+  relaunch loads the retained checked files and renders again.
+
+The final screenshot and filtered logs are under ignored `private/device/mesh/`.
+The independent CPU reference image and its research script also stay private.
+The APK remains installed with the checked model/image in app storage.
+
+This verifies one static model and colour map. General OBJ/KTMDL materials,
+normal/specular mapping, skinning, animation, camera orbit/zoom and sustained
+frame times remain unverified or unimplemented. Landscape rendering is visually
+checked; portrait framing passes CPU tests but still needs a persistent device
+view. No native FPS benchmark or PES engine/gameplay claim follows from this run.

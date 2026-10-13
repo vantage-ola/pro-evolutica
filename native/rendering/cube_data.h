@@ -29,4 +29,5 @@ Pixels checkerboard();
 // Column-major model/view/projection for a unit cube, with a 60-degree field
 // of view and fixed tilt. The camera moves back in portrait to keep it visible.
 Matrix transform(float angle, float aspect);
+Matrix rotation(float angle);
 } // namespace cube_data

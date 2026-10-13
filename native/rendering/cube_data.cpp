@@ -31,18 +31,23 @@ Pixels checkerboard() {
     return pixels;
 }
 
-Matrix transform(float angle, float aspect) {
-    if (!std::isfinite(angle) || !std::isfinite(aspect) || aspect <= 0)
-        throw std::invalid_argument("Cube angle/aspect must be finite; aspect must be positive");
+Matrix rotation(float angle) {
+    if (!std::isfinite(angle)) throw std::invalid_argument("Rotation angle must be finite");
     const float cy = std::cos(angle), sy = std::sin(angle);
     const float cx = std::cos(.45f), sx = std::sin(.45f);
     const Matrix yaw{cy,0,-sy,0, 0,1,0,0, sy,0,cy,0, 0,0,0,1};
     const Matrix tilt{1,0,0,0, 0,cx,sx,0, 0,-sx,cx,0, 0,0,0,1};
+    return multiply(yaw, tilt);
+}
+
+Matrix transform(float angle, float aspect) {
+    if (!std::isfinite(angle) || !std::isfinite(aspect) || aspect <= 0)
+        throw std::invalid_argument("Cube angle/aspect must be finite; aspect must be positive");
     const float distance = 4.5f * std::max(1.0f, 1.0f / aspect);
     const Matrix view{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,-distance,1};
     constexpr float near = .1f, far = 100.0f, focal = 1.73205080757f;
     const Matrix projection{focal/aspect,0,0,0, 0,focal,0,0,
         0,0,(far+near)/(near-far),-1, 0,0,2*far*near/(near-far),0};
-    return multiply(projection, multiply(view, multiply(yaw, tilt)));
+    return multiply(projection, multiply(view, rotation(angle)));
 }
 } // namespace cube_data

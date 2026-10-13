@@ -1,8 +1,8 @@
 # Project status
 
 PES 2013 runs in Winlator: peak 60 FPS, with choppy gameplay throughout the match.
-Repeated menu effects remain unresolved. Asset research now has a verified DXT1
-texture extraction and PNG preview. See [DECISION_001.md](DECISION_001.md)
+Repeated menu effects remain unresolved. The separate native viewer now renders
+one checked PES 2013 ball with its colour texture. See [DECISION_001.md](DECISION_001.md)
 for the development direction and [PLAN.md](PLAN.md) for the next results and
 their verification checks.
 
@@ -29,11 +29,11 @@ their verification checks.
   All 1,144 triangles have positive area and agree with the vertex normals.
   Texture selection is supported by the IDs and visual checks of the three
   bundle images; the binding convention remains sample-specific. Android model
-  rendering and the final visual UV check remain pending.
+  rendering and the visual UV check now pass for this ball.
 - The native triangle runs on the Note20, with screenshot/log evidence for
   rendering, touch, PS4 X-button input, background/resume and Android Back.
-- The current native scene is a rotating textured cube with a local PNG or an
-  original checkerboard, perspective and depth testing. Both CTest targets pass:
+- The original cube remains the fallback scene, with a local PNG or checkerboard,
+  perspective and depth testing. Its two existing CTest targets pass:
   five cube check groups and 167 PNG checks, including sanitizer runs. The ARM64
   APK builds offline. Signature/library checks,
   installation, rendered screenshots, touch/PS4 input and background/resume
@@ -43,6 +43,15 @@ their verification checks.
   from the app's private storage on the Note20. Its decoded pixels match the
   independent reference exactly. Missing/malformed-file fallback, touch input
   and background/resume pass. Game images remain outside the APK and Git.
+- The bounded portable OBJ reader loads the checked static ball export: 682
+  vertices and 1,144 triangles. Its vertex/index bytes agree exactly with the
+  independent reader output on the Mac and through phone CRC checks. The model's
+  own 512 × 512 colour PNG renders with coherent panel/marking alignment and
+  agrees visually with a separate CPU reference render. Missing/damaged model
+  and image fallbacks, touch/PS4 tint, rotation pause/resume, background/resume
+  and Android Back pass. The mesh CTest target adds 1,496 checks; all three
+  targets pass normally and with sanitizers. The APK builds offline and contains
+  no supplied assets. See [verification/android.md](verification/android.md#static-ball-model).
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
@@ -122,9 +131,9 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## Next three tasks
 
-1. Add a bounded portable mesh reader using the checked static export and
-   original fixtures; keep unsupported models on the existing fallback scene.
-2. Show the ball and selected colour texture on the Note20, checking orientation,
-   UV alignment, culling, missing/damaged assets and background/resume.
-3. Add camera controls and measurements after the model renders correctly,
-   following [PLAN.md](PLAN.md).
+1. Add orbit, zoom and reset controls around the mesh's checked bounds; verify
+   portrait/landscape framing and touch/controller behaviour.
+2. Measure model load time, frame times and memory with a repeatable native run.
+   No sustained native FPS result is claimed yet.
+3. After those checks, select a skeleton/animation sample and document its
+   hierarchy, weights and timing before implementing it, following [PLAN.md](PLAN.md).

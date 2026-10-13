@@ -18,6 +18,9 @@ struct App {
     Cube cube;
     int colour = 0;
     bool vsync = false;
+    bool mesh_loaded = false;
+    bool paused = false;
+    float angle = .6f;
     // Android can deliver lifecycle events from a different thread.
     std::atomic<bool> active{true};
     std::atomic<bool> running{true};
@@ -45,6 +48,37 @@ void change_colour(App& app, const char* input) {
     SDL_Log("Input: %s; colour=%d", input, app.colour);
 }
 
+void pause_rotation(App& app) {
+    app.paused = !app.paused;
+    SDL_Log("Rotation %s; angle=%.9g", app.paused ? "paused" : "resumed", app.angle);
+}
+
+void load_mesh(App& app) {
+    const char* directory = SDL_GetAndroidInternalStoragePath();
+    if (!directory) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Mesh: %s; using cube", SDL_GetError());
+        return;
+    }
+    try {
+        const auto mesh = assets::load_obj(std::string(directory) + "/model.obj");
+        std::string error;
+        if (!app.cube.set_mesh(mesh, error)) throw std::runtime_error(error);
+        app.mesh_loaded = true;
+        SDL_Log("Mesh loaded: %zu vertices, %zu triangles; centre=(%.9g,%.9g,%.9g); radius=%.9g",
+            mesh.vertices.size(), mesh.indices.size()/3, mesh.centre[0],mesh.centre[1],mesh.centre[2],mesh.radius);
+        SDL_Log("Mesh CRC32: vertices=%08lx; indices=%08lx",
+            crc32(0, reinterpret_cast<const Bytef*>(mesh.vertices.data()),
+                  static_cast<uInt>(mesh.vertices.size() * sizeof(assets::MeshVertex))),
+            crc32(0, reinterpret_cast<const Bytef*>(mesh.indices.data()),
+                  static_cast<uInt>(mesh.indices.size() * sizeof(std::uint16_t))));
+    } catch (const std::system_error& error) {
+        if (error.code().value() == ENOENT) SDL_Log("Mesh: no model.obj; using cube");
+        else SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Mesh: %s; using cube", error.what());
+    } catch (const std::exception& error) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Mesh: %s; using cube", error.what());
+    }
+}
+
 void load_texture(App& app) {
     // The Android adapter chooses the path; the reader has no SDL dependency.
     const char* directory = SDL_GetAndroidInternalStoragePath();
@@ -53,14 +87,15 @@ void load_texture(App& app) {
         return;
     }
     try {
-        const auto image = assets::load_png(std::string(directory) + "/texture.png");
+        const char* file = app.mesh_loaded ? "model.png" : "texture.png";
+        const auto image = assets::load_png(std::string(directory) + "/" + file);
         std::string error;
         if (!app.cube.set_texture(image, error)) throw std::runtime_error(error);
         SDL_Log("Texture loaded: %ux%u RGBA8; pixels CRC32=%08lx", image.width, image.height,
                 crc32(0, image.rgba.data(), static_cast<uInt>(image.rgba.size())));
     } catch (const std::system_error& error) {
         if (error.code().value() == ENOENT)
-            SDL_Log("Texture: no texture.png; using checkerboard");
+            SDL_Log("Texture: no %s; using checkerboard", app.mesh_loaded ? "model.png" : "texture.png");
         else SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Texture: %s; using checkerboard", error.what());
     } catch (const std::exception& error) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Texture: %s; using checkerboard", error.what());
@@ -91,6 +126,7 @@ bool create(App& app) {
         SDL_SetError("%s", error.c_str());
         return false;
     }
+    load_mesh(app);
     load_texture(app);
     int count = 0;
     SDL_JoystickID* gamepads = SDL_GetGamepads(&count);
@@ -111,6 +147,7 @@ void handle_input(App& app, const SDL_Event& event) {
     case SDL_EVENT_KEY_DOWN:
         if (event.key.key == SDLK_ESCAPE || event.key.key == SDLK_AC_BACK)
             app.running = false;
+        else if (event.key.key == SDLK_SPACE && !event.key.repeat) pause_rotation(app);
         break;
     case SDL_EVENT_FINGER_DOWN:
         change_colour(app, "touch");
@@ -129,9 +166,11 @@ void handle_input(App& app, const SDL_Event& event) {
         }
         break;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
-        if (app.gamepad && event.gbutton.which == SDL_GetGamepadID(app.gamepad) &&
-            event.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH)
-            change_colour(app, "gamepad south button");
+        if (app.gamepad && event.gbutton.which == SDL_GetGamepadID(app.gamepad)) {
+            if (event.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH)
+                change_colour(app, "gamepad south button");
+            else if (event.gbutton.button == SDL_GAMEPAD_BUTTON_START) pause_rotation(app);
+        }
         break;
     }
 }
@@ -157,7 +196,6 @@ int main(int, char**) {
     }
     bool first_frame = true;
     Uint64 previous = SDL_GetTicksNS();
-    float angle = .6f;
     int result = 0;
     while (app.running) {
         SDL_Event event;
@@ -181,8 +219,8 @@ int main(int, char**) {
         const Uint64 now = SDL_GetTicksNS();
         const float elapsed = std::min(.1f, float(now - previous) / 1'000'000'000.0f);
         previous = now;
-        angle = std::fmod(angle + elapsed * .65f, 6.28318530718f);
-        app.cube.draw(width, height, app.colour, angle);
+        if (!app.paused) app.angle = std::fmod(app.angle + elapsed * .65f, 6.28318530718f);
+        app.cube.draw(width, height, app.colour, app.angle);
         const GLenum error = glGetError();
         if (error != GL_NO_ERROR || !SDL_GL_SwapWindow(app.window)) {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Frame: GL=0x%x; SDL=%s",
@@ -191,7 +229,7 @@ int main(int, char**) {
             break;
         }
         if (first_frame) {
-            SDL_Log("Textured cube frame submitted: %dx%d", width, height);
+            SDL_Log("Textured %s frame submitted: %dx%d", app.mesh_loaded ? "mesh" : "cube", width, height);
             first_frame = false;
         }
         if (!app.vsync) SDL_Delay(16);

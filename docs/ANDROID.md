@@ -1,14 +1,19 @@
 # Native Android test scene
 
-The triangle established rendering and input on the Note20. The current scene
-draws a rotating cube through OpenGL ES 3, with a locally supplied PNG or an
-original 64 × 64 checkerboard, depth testing, perspective and per-face shading.
-Rotation uses elapsed time;
-portrait views move the camera back to keep the cube visible.
+The triangle established rendering and input on the Note20. The viewer now
+loads one checked static mesh and its PNG from local app storage. The selected
+PES 2013 ball has been rendered on the Note20 with its colour texture. The
+original rotating cube remains available when no supported mesh is supplied.
+Both scenes use OpenGL ES 3, depth testing, back-face culling and perspective.
+The mesh has simple directional lighting; the cube keeps its per-face shading.
+Geometry is framed around its centre and radius. Portrait views move the camera
+back to keep the scene visible, and rotation uses elapsed time.
 
 Tapping the screen or pressing a gamepad's south button (X on the tested PS4
 controller) changes its tint. Android Back closes the app. The renderer stays
 separate from SDL's window, input and lifecycle code. No game files are packaged.
+Space or the gamepad Start button (Options on the tested PS4) pauses/resumes
+rotation for inspection. Camera orbit and zoom are not implemented yet.
 
 ## Build requirements
 
@@ -65,7 +70,8 @@ press its south button; check the tint and corresponding input log. Send the app
 to the background and resume it, then check Android Back closes it cleanly.
 
 Logs should identify the actual GL renderer/version and include
-`Textured cube frame submitted`. A successful build or that log alone does not prove
+`Textured mesh frame submitted` or `Textured cube frame submitted`. A successful
+build or that log alone does not prove
 the image looks correct; keep a screenshot and the manual input result.
 
 ## Load a local texture
@@ -76,7 +82,7 @@ logs the reason. No storage permission is needed. With one authorised phone:
 
 ```bash
 adb shell run-as com.proevolutica.viewer mkdir -p files
-adb exec-in run-as com.proevolutica.viewer tee files/texture.png \
+adb shell -T run-as com.proevolutica.viewer tee files/texture.png \
   < private/extracted/dt08-entry-00002.png > /dev/null
 adb shell run-as com.proevolutica.viewer sha256sum files/texture.png
 adb shell am force-stop com.proevolutica.viewer
@@ -101,9 +107,51 @@ and uses the existing system/NDK zlib library. SDL's
 [internal-storage API](https://wiki.libsdl.org/SDL3/SDL_GetAndroidInternalStoragePath)
 selects the Android path; the reader has no Android or SDL dependency.
 
+## Load the checked static mesh
+
+Create the local OBJ using [the static exporter](TOOLS.md#export-a-supported-static-ktmdl-packet).
+Supply the selected colour PNG explicitly; the app does not resolve game bundle
+IDs or load material files.
+
+```bash
+adb shell run-as com.proevolutica.viewer mkdir -p files
+adb shell -T run-as com.proevolutica.viewer tee files/model.obj \
+  < private/extracted/ball.obj > /dev/null
+adb shell -T run-as com.proevolutica.viewer tee files/model.png \
+  < private/extracted/ball-colour.png > /dev/null
+adb shell run-as com.proevolutica.viewer sha256sum files/model.obj files/model.png
+shasum -a 256 private/extracted/ball.obj private/extracted/ball-colour.png
+adb shell am force-stop com.proevolutica.viewer
+adb shell am start -n com.proevolutica.viewer/.ViewerActivity
+```
+
+Compare both device hashes with the local files before relying on a render.
+Use `shell -T` for the transfer: an `exec-in` transfer truncated the model during
+testing. The reader rejected that partial file and retained the cube.
+
+The OBJ reader accepts only our static export subset: equal-size position,
+UV and normal arrays; positive, matching `v/vt/vn` indices; triangle faces;
+and at most one object. It rejects materials, groups, smoothing directives,
+polygons, negative indices and separate index streams. It never opens files
+named inside an OBJ. Input is capped at 32 MiB, 500,000 lines, 512 bytes per line,
+65,535 vertices and 600,000 triangle-list indices. Attribute magnitudes above
+1,000,000, normals/radii below 1e-6, non-finite values, invalid indices and
+zero-area faces are refused. The file must be regular, stable and not a symlink.
+
+Mesh positions, normals and UVs remain unchanged in the reader. Centre/radius
+are computed for framing; the renderer recentres and scales uniformly. The
+checked KTMDL UVs address the top-first PNG directly; the original cube's UVs
+retain their earlier vertical flip. This is not a general OBJ material viewer.
+Normal/specular maps, proprietary shaders, skinning and animation are unsupported.
+
+Missing/damaged `model.obj` uses the cube and its existing `texture.png` path.
+A valid mesh with missing/damaged `model.png` uses the original checkerboard on
+that mesh. Removing only `files/model.obj` with `run-as` and restarting returns
+to the cube. No game asset is included in the APK.
+
 ## CPU tests
 
-The geometry, checkerboard, camera math and PNG reader need neither SDL nor
+The geometry, checkerboard, camera math, PNG and OBJ readers need neither SDL nor
 Android to test.
 The host PNG target uses the installed system zlib headers/library.
 With `ANDROID_HOME` pointing to the installed SDK:
@@ -123,5 +171,14 @@ truncation, CRC errors, allocation bounds, invalid chunk order, corrupt zlib
 streams and regular-file restrictions. It has a ten-second timeout so a
 regression in the FIFO check cannot block the test run indefinitely.
 
-The locally extracted PES texture has been verified on the Note20. Its intended
-in-game use is still unknown; it remains outside the APK and Git.
+The mesh target checks original known positions, normals, UVs and face indices,
+framing through a full rotation at five aspect ratios, CRLF/comments/exponents,
+unsupported records, malformed faces, finite values, degeneracy, allocation
+limits and regular-file/symlink/FIFO restrictions. It also has a ten-second
+timeout. All three targets pass normally and with address/undefined-behaviour
+sanitizers. Device results and asset checksums are in
+[verification/android.md](verification/android.md#static-ball-model).
+
+The earlier grayscale texture's in-game use remains unknown. The selected ball
+and its colour texture now have verified native rendering; all extracted assets
+remain outside the APK and Git.

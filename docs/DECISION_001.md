@@ -30,6 +30,7 @@ unsupported until their respective results exist.
 
 The spatial sample is now identified as a ball. Its static OBJ geometry matches
 an independent reader exactly, including strip winding, normals and both UV
-sets. Material IDs and visual image checks support the selected DXT1 colour
-texture. Continue with portable mesh loading and the Android visual check;
-normal/specular shading and animation remain separate work.
+sets. The portable reader and Android renderer now display it with the selected
+DXT1 colour texture. Source-byte checks and a separate visual reference agree;
+fallback, input and lifecycle checks pass. Continue with orbit/zoom/reset and
+native measurements. Normal/specular shading and animation remain separate work.

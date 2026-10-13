@@ -14,9 +14,12 @@ approach. The working Winlator installation remains the route for playing PES.
   native cube on the Note20. The image stays outside the APK and Git.
 - The ARM64 app builds offline with the installed dependencies. Rendering,
   touch, PS4 input and background/resume have device evidence.
+- One static ball model now renders with its own colour PNG on the Note20,
+  with checked source geometry, visual reference agreement and file fallbacks.
 
-These results establish an asset-loading and rendering path. Models, animation,
-gameplay systems and the cause of Winlator's stutter remain unverified.
+These results establish an asset-loading and rendering path for one static
+model. General model support, animation, gameplay systems and the cause of
+Winlator's stutter remain unverified.
 See [STATUS.md](STATUS.md) for current evidence and limitations.
 
 ## Find and document one model
@@ -56,7 +59,7 @@ Current result: the spatial sample is a ball. Its geometry and texture-reference
 metadata match a pinned independent reader; a checked local OBJ and DXT1 colour
 PNG exist. IDs and visual inspection support the sample's texture selection.
 The general bundle ID convention remains an inference, so selection stays
-explicit. The Android step must verify the texture's UV alignment visually.
+explicit. The Android result below verifies the selected texture's UV alignment.
 See [the research record](research/pes2013.md#static-ball-geometry-and-textures).
 
 ## Display the model on Android
@@ -73,6 +76,14 @@ and touch/controller input. Save screenshots and process-filtered logs privately
 
 Complete when the phone shows the same supported geometry and mapping as the
 independent reference. A successful build or frame-submission log is insufficient.
+
+Current result: the static ball and its colour texture render on the Note20.
+Native vertex/index bytes match the independent reader output, and a separate
+CPU render agrees visually with the device's silhouette and texture placement.
+Missing/damaged file fallbacks, touch/PS4 controls, pause/resume, lifecycle and
+Back pass. Three native CTest targets and sanitizer runs pass. See
+[the device verification](verification/android.md#static-ball-model). Proceed to
+camera controls and measurements; do not infer general model/animation support.
 
 ## Make the model inspectable and measure it
 
