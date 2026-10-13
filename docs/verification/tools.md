@@ -13,9 +13,9 @@ Command:
 Exact final output, also saved in [tools-tests.txt](tools-tests.txt):
 
 ```text
-........................................................................ [ 98%]
-.                                                                        [100%]
-73 passed in 0.72s
+........................................................................ [ 67%]
+..................................                                       [100%]
+106 passed in 0.90s
 ```
 
 The test suite generates two-section PE fixtures in pytest temporary directories.
@@ -37,6 +37,14 @@ invalid offsets/indices, resource caps, and CLI errors. They also check overwrit
 and symlink refusal, non-blocking FIFO rejection, detection of input mutation,
 and removal of a partial extraction after a truncated read. No proprietary
 fixtures or third-party parser packages are needed.
+
+The 33 WESYS tests generate original zlib-wrapped payloads. They check lengths,
+hashes, empty decoded data, zero padding, malformed headers, unsupported variants,
+size limits, bad checksums, truncated/concatenated streams, and CLI output/errors.
+A false-size fixture expands to 2 MiB, but decoding rejects it with less than
+512 KiB of traced Python allocations. File tests check overwrite/symlink refusal,
+non-blocking FIFO rejection, destination validation, detection of input mutation,
+and absence of decoded outputs after format errors.
 
 ```bash
 .venv/bin/python -m pip check
@@ -91,11 +99,33 @@ matched the extracted bytes exactly. `shasum` agreed with the archive and output
 hashes in [the research record](../research/pes2013.md). `git check-ignore`
 confirmed both the raw extraction and report are excluded from Git.
 
+## WESYS decoding
+
+`inspect_wesys()` decoded all ten non-empty `dt10.img` entries: 140,960 bytes in
+total. Each output matched a separate one-shot `zlib.decompress()` of the declared
+compressed range, using the same underlying zlib library. Each compressed stream
+reached its end marker with no unused or unconsumed bytes, a valid checksum and
+the exact declared decoded length. Padding was zero-filled, 2–10 bytes per entry.
+
+```bash
+.venv/bin/python tools/wesys_unpack.py \
+  --input private/extracted/dt10-entry-00001.bin \
+  --output private/extracted/dt10-entry-00001-decoded.bin \
+  --json private/reports/dt10-entry-00001-wesys.json
+shasum -a 256 private/extracted/dt10-entry-00001-decoded.bin
+```
+
+The CLI returned 0 and produced 28,272 bytes. `shasum` agreed with
+`2cf527971ca3b7222c69dd0d3681e56a79fbe319763f8070288274fcb42e5e56`.
+`git check-ignore` confirmed the decoded file and report remain excluded.
+The runtime used Python's bundled zlib 1.2.12; no new dependency was installed.
+
 ## Review and limits
 
 Reports preserve parser warnings; an import list with warnings requires further
-review. These checks verify the diagnostics and raw AFS extraction on macOS ARM64.
-They do not verify payload decoding, REA/Ghidra, native rendering or device
-connectivity. The manual Winlator report is recorded separately in
+review. These checks verify the diagnostics, AFS extraction and the observed
+WESYS/zlib wrapper on macOS ARM64. They do not verify contained script bytecode,
+mesh/texture formats, REA/Ghidra, native rendering or device connectivity.
+The manual Winlator report is recorded separately in
 [the phone baseline](../benchmarks/pes2013-baseline.md); sustained performance
 has not been measured.

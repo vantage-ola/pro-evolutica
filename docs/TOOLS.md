@@ -133,3 +133,36 @@ errors. Keep extracted bytes under ignored local storage.
 This is an independent standard-library implementation. No third-party parser
 was installed or copied. Format references and real-sample checks are in
 [research/pes2013.md](research/pes2013.md).
+
+## Decode an extracted WESYS entry
+
+```bash
+.venv/bin/python tools/wesys_unpack.py \
+  --input private/extracted/dt10-entry-00001.bin \
+  --output private/extracted/dt10-entry-00001-decoded.bin \
+  --json private/reports/dt10-entry-00001-wesys.json
+```
+
+Omit `--output` to inspect and validate without saving decoded bytes. Omit `--json`
+to print the report on stdout. Existing destinations are refused; parent
+directories must exist. Exit statuses are 0 for success, 1 for file/format errors
+and 2 for argument errors. Keep decoded content under ignored `private/`.
+
+This reader supports the observed `00 01 01 WESYS` header with little-endian
+compressed/decoded lengths and one complete zlib stream. It accepts up to 15 zero
+padding bytes after the declared compressed range, as seen in the local AFS
+entries. Other header variants, non-zero trailing data, concatenated streams,
+truncated data, checksum errors and incorrect decoded lengths are rejected.
+
+Input and decoded output are each capped at 64 MiB. Decompression stops at the
+declared decoded length plus one byte, so a false small size cannot trigger
+unbounded expansion. The input is read into a bounded memory buffer before
+decoding. Use stable regular files; the final input path cannot be a symlink.
+Size/timestamp checks detect common concurrent changes. File read errors and
+format errors create no decoded output; a later write/report failure may leave
+an output that should be discarded.
+
+Reports contain input and decoded SHA-256 hashes, header bytes, compressed and
+decoded sizes, zero-padding length and the first 32 decoded bytes in hex. The
+decoder does not classify, interpret or execute the contents. It uses Python's
+standard-library `zlib`; no new package is required.

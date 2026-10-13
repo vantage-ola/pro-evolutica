@@ -14,7 +14,9 @@ Start with the actual AFS containers. The new reader has inspected all 19 local
 `.img` files and extracted one entry with a verified checksum. It uses no new
 dependencies and makes no assumptions about what an entry represents.
 
-The next deliverable is a tested reader for the observed `WESYS` payload wrapper,
-if its format can be verified, followed by one identified asset. Android rendering
-will use that verified asset or an original test asset. Container extraction alone
-does not establish that models, textures or the proprietary engine are supported.
+The WESYS decoder now passes synthetic tests and decodes all ten non-empty
+`dt10.img` entries. Their markers indicate likely compiled scripts, with VM
+compatibility and behaviour still unverified. Next, select a texture or mesh from
+another container and validate its format. Android rendering will use that
+verified asset or an original test asset. Successful decompression alone does
+not establish support for models, textures or the proprietary engine.

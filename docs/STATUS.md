@@ -1,8 +1,8 @@
 # Project status
 
 PES 2013 runs in Winlator: peak 60 FPS, with choppy gameplay throughout the match.
-Repeated menu effects remain unresolved. Asset research now has a tested AFS
-reader and a verified raw entry extraction. See [DECISION_001.md](DECISION_001.md)
+Repeated menu effects remain unresolved. Asset research now has tested AFS and
+WESYS readers, with verified extraction and decoding. See [DECISION_001.md](DECISION_001.md)
 for the next development direction.
 
 ## Verified deliverables
@@ -15,11 +15,13 @@ for the next development direction.
   symlink/special-file exclusion and explicit partial-scan errors.
 - `tools/afs_inspect.py`: bounded AFS entry-table inspection, archive hashes and
   extraction of one raw entry by index, with an output checksum.
+- `tools/wesys_unpack.py`: bounded zlib decoding of the observed WESYS variant,
+  with exact length/checksum checks and input/output hashes.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
-- **73 tests pass** on Python 3.11.9. Commands and results are in
+- **106 tests pass** on Python 3.11.9. Commands and results are in
   [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
 - The phone gameplay report is recorded in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
@@ -44,9 +46,12 @@ The PES 2013 inventory scanned 42 files, 6,206,731,485 bytes, with no read error
 skipped entries. It observed 19 `.img` and 13 `.sfd` files, among other extensions.
 All 19 `.img` files passed AFS index inspection: 55,593 slots, 1,273 empty.
 One 1,840-byte entry from `dt10.img` was extracted and compared byte-for-byte with
-an independent source read. Its payload remains undecoded. Details and hashes
-are in [research/pes2013.md](research/pes2013.md). Full reports and extracted bytes
-remain under ignored `private/`; no proprietary content is included in source.
+an independent source read. All ten non-empty entries have now been decoded from
+WESYS/zlib: 140,960 bytes total, with exact lengths and matching reference output.
+The decoded data has markers consistent with Squirrel compiled scripts; its
+instructions and game behaviour remain unverified. Details and hashes are in
+[research/pes2013.md](research/pes2013.md). Full reports and decoded bytes remain
+under ignored `private/`; no proprietary content is included in source.
 
 ## Phone result
 
@@ -70,9 +75,9 @@ remain under ignored `private/`; no proprietary content is included in source.
 
 ## Next three tasks
 
-1. Verify the observed `WESYS` entry wrapper and implement a bounded decoder with
-   synthetic tests if the format evidence supports it.
-2. Identify and inspect one decoded texture, mesh or metadata sample; document
-   supported versions and verify its output before adding rendering code.
+1. Find a texture or mesh candidate in another AFS container and verify that the
+   WESYS decoder supports its wrapper.
+2. Implement the smallest reader for that candidate; document its version and
+   verify dimensions/geometry and output before adding rendering code.
 3. Check the Android SDK/NDK/SDL3 setup and build an original ARM64 test scene.
    Device installation and rendering will need separate verification.
