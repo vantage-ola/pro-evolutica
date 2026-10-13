@@ -1,7 +1,8 @@
 # Native PES asset research plan
 
 The native app displays one verified PES 2013 ball with its own texture.
-The next target is repeatable device measurements. Each step ends with a result
+The viewer now has a repeatable device measurement baseline. The next target
+is one evidenced skeleton and animation sample. Each step ends with a result
 we can inspect and repeat.
 Advance only when its checks pass, or record a specific blocker and change the
 approach. The working Winlator installation remains the route for playing PES.
@@ -100,8 +101,12 @@ Additional materials and scene objects follow only when supported samples exist.
 Current result: orbit/zoom/reset are implemented and verified through native
 camera/gesture tests and touch/PS4 device checks. Camera bounds keep the ball
 visible at both zoom limits. See [the camera record](verification/android.md#camera-controls).
-Load/frame-time/memory measurements remain pending; complete them before moving
-to animation.
+Load/frame-time/memory measurements now pass: the final portrait APK records
+60.039 FPS over 60.011 seconds, p99 19.670 ms and a maximum interval of 25.509 ms.
+Startup stages, memory/thermal snapshots, raw-sample recomputation and failed
+capture evidence are recorded in [the measurements](verification/android.md#native-measurements).
+This completes the static viewer checks; proceed to animation sample research.
+It does not establish general model support or game performance.
 
 ## Investigate animation
 

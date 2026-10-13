@@ -437,3 +437,136 @@ camera/input code also passed the earlier landscape checks.
 Private screenshots and process-filtered logs are under `private/device/camera/`.
 Camera controls do not establish sustained frame-time, startup or memory
 measurements. Those remain the next deliverable before animation research.
+
+## Native measurements
+
+The original frame recorder is portable C++ with no SDL/Android dependency.
+A fixed capture warms up for five seconds, anchors on a completed frame, then
+stores frame intervals and submit/swap wall times for at least 60 seconds.
+Its 20,000-sample buffer is allocated before warmup; collection performs no
+per-frame allocation or file write. Summary sorting and CSV/JSON writing happen
+after recording. Input, controller movement, resize, background or closing
+cancel the active run. B toggles start/cancel; a new capture removes old results.
+JSON completion is published only after its CSV.
+
+Tests use known uneven intervals to check aggregate FPS, nearest-rank
+percentiles, spikes and exact threshold boundaries. They also check warmup
+exclusion, overshoot, bad clocks/stage times, restart/cancel and allocation caps.
+The five native targets pass with warnings as errors:
+
+```text
+5 cube checks passed: geometry, texture, projection, visibility, invalid inputs
+109186 camera checks passed: framing, bounds, sticks, touch
+29 frame metric checks passed: summaries, warmup, clocks, bounds, cancellation
+167 PNG checks passed: pixels, filters, CRC, bounds, zlib, ordering, files
+1496 mesh checks passed: geometry, framing, format, bounds, files
+100% tests passed, 0 tests failed out of 5
+Total Test time (real) =   2.19 sec
+```
+
+The same five targets pass with AddressSanitizer/UndefinedBehaviorSanitizer in
+4.09 seconds without diagnostics. The final offline Gradle build reports:
+
+```text
+BUILD SUCCESSFUL in 9s
+36 actionable tasks: 5 executed, 31 up-to-date
+```
+
+APK size: 4,030,262 bytes; SHA-256:
+`f0b08ac5fd5edb434bfa1ffbf40898cb6edc6d31123284a6630fdd4e23cb0cc9`.
+ZIP CRCs, v1/v2 signatures and the three AArch64 ELF libraries verify. The APK
+has no asset entries or exact supplied model/image bytes. Installation returns
+`Success`. On-device checks confirm B-toggle, touch and background cancellation
+publish no completed report. Android background notifications require an SDL
+event watch; the old event filter missed them. The final build uses the watch
+and a Home/resume check logs `Benchmark aborted: background`. SDL documents
+this delivery in its pinned [event header](https://github.com/libsdl-org/SDL/blob/release-3.4.18/include/SDL3/SDL_events.h).
+The fixed-run collector checks local/installed APK equality, process identity,
+completion logs, report schema and CSV sample count.
+
+### Method and conditions
+
+The commands in [ANDROID.md](../ANDROID.md#measure-a-native-run) reproduce the
+capture through `scripts/benchmark_android.py`. This run used the debug ARM64
+APK above, Android 13/API 33 on the SM_N981U, Adreno 650/OpenGL ES 3.2, a
+1080 × 2308 portrait drawable and vsync enabled. The display reports about
+60 Hz. The scene is the rotating checked ball at default camera/tint: 682
+vertices, 1,144 triangles and its 512 × 512 colour texture. Each capture has a
+fresh app process, five seconds warmup and at least 60 seconds of recorded time;
+OS file caches were not flushed. Charging stays enabled and device settings
+are unchanged. Memory/thermal/battery reads occur before warmup and after the
+report, outside the frame window.
+
+The model and image file hashes are the previously verified
+[ball inputs](../research/pes2013.md#static-ball-geometry-and-textures).
+Native vertex/index/pixel CRCs match on every run. Raw CSV timestamp differences,
+frame counts, elapsed seconds, FPS, percentiles, maxima and threshold counts
+are recalculated independently with Python's standard library.
+
+Intervals measure successful frame completions in the app loop, not compositor
+presentation. Submit/swap figures are wall times; driver waiting and scheduling
+can contribute. They are neither GPU execution timers nor CPU utilisation.
+Native-main-to-first-swap excludes Java and process startup; ADB launch time is
+recorded separately. Frames above 16.67 ms are counted strictly, including small
+variations around refresh timing, and are not a dropped-presentation count.
+This is a short baseline for one static asset in a debug viewer, not a full game
+or a long thermal soak.
+
+Memory snapshots use [Android's `dumpsys meminfo`](https://developer.android.com/tools/dumpsys#meminfo).
+PSS assigns shared pages proportionally to the process. These snapshots give
+process footprint at those instants, not peak memory or proof about leaks.
+Thermal status values use [Android's thermal codes](https://developer.android.com/reference/android/os/PowerManager#THERMAL_STATUS_MODERATE).
+Private raw results, launch logs and snapshots remain in
+`private/device/native-baseline-final/`. Earlier runs and interrupted attempts
+remain in `private/device/native-baseline/` and
+`private/device/native-baseline-replacement/`; extracted assets are not redistributed.
+
+### Recorded results
+
+The final APK completes one portrait capture: 3,603 frames in 60.011107 seconds,
+**60.039 FPS**. Frame interval mean is 16.656 ms, median 16.634 ms, p95 18.311 ms,
+p99 19.670 ms and maximum 25.509 ms. There are 1,740 intervals above 16.666667 ms,
+zero above 33.333333 ms and zero above 50 ms. Mean submit/swap wall times are
+15.429/1.136 ms. The raw CSV reproduces every summary value and satisfies the
+adjacent timestamp and stage-duration checks.
+
+In that fresh process, mesh read/parse takes 12.660 ms and upload 0.186 ms;
+PNG read/decode takes 49.390 ms and upload 0.528 ms. Native creation takes
+99.173 ms and main-to-first-swap 104.585 ms. ADB reports a 300 ms cold activity
+launch. These measurements have different start points and should not be added.
+
+Before/after process PSS is 101,342/96,563 KiB (98.97/94.30 MiB); RSS is
+183,600/182,516 KiB. Graphics PSS stays at 50,936 KiB. Native heap allocated bytes
+rise from 11,242 to 11,838 KiB, consistent in scale with the 625 KiB capture
+buffer reserved after the first snapshot. This is not a leak assessment.
+Thermal status is 2 (moderate) in both snapshots; AP temperature changes from
+44.2 to 41.8 °C and skin from 38.7 to 38.2 °C. USB power is connected, battery
+level is 100%, and battery temperature changes from 38.3 to 38.2 °C. This was
+not a cold-device benchmark. The final screenshot retains the coloured ball.
+Android Back closes native main cleanly; relaunch loads the retained checked files in a new process,
+submits a portrait mesh frame and accepts keyboard reset. Lifecycle evidence
+stays in `private/device/metrics-checks/`.
+
+Two earlier landscape captures used the preceding instrumented APK, SHA-256
+`0f57b544d662830b0962b3d8cefe50eb50e86e2460248054122e88d7e19536c5`.
+Its frame recorder/rendering code is the same; the final APK changes lifecycle
+notification handling. Keep these observations separate from the final build:
+
+- Run 1: 3,605 frames in 60.010357 s, 60.073 FPS; p95 18.354 ms, p99 19.751 ms,
+  maximum 37.275 ms; three intervals above 33.33 ms, none above 50 ms.
+  Main-to-first-swap is 98.273 ms. PSS is 109,757/102,035 KiB before/after.
+- Run 2: 3,602 frames in 60.009394 s, 60.024 FPS; p95 18.588 ms, p99 20.129 ms,
+  maximum 32.359 ms; none above 33.33 or 50 ms. Main-to-first-swap is 104.099 ms.
+  PSS is 88,125/87,669 KiB before/after.
+
+Both earlier runs report thermal status 1 (light); AP temperature spans
+42.7–45.1 °C and skin 39.1–39.8 °C. Their raw summaries also pass independent
+recalculation. Different orientations/builds/thermal conditions are not a
+controlled comparison, and the three captures are not pooled.
+
+The third landscape attempt and its replacement both switch to portrait while
+recording. Each logs `Benchmark aborted: input or viewport change`, produces no
+completed report and makes the collector fail. These are excluded from the
+performance results; their private logs retain the failed attempts. Collector
+CLI checks also reject an existing output directory and an out-of-range run
+count. No package installation or device-setting change was needed.

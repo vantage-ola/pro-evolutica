@@ -33,6 +33,53 @@ larger radius as well as the normalised mesh. Resize/background/cancel events
 clear touch gestures so a stale finger cannot trigger a tap or reset. The
 resizable SDL window explicitly allows portrait and landscape rotation.
 
+## Measure a native run
+
+Keyboard B (or `adb shell input keyevent 30`) starts a fixed benchmark. It resets
+the camera/tint/model angle, resumes rotation, warms up for five seconds, then
+records at least 60 seconds. Input, stick movement, backgrounding or resizing
+aborts the capture. A second B press also cancels it. Keep the phone in one
+orientation and the app in the foreground during the run.
+
+The app keeps up to 20,000 raw frame samples in a preallocated buffer and writes
+`files/benchmark.json` and `files/benchmark-frames.csv` afterward. Starting a new
+capture removes the preceding report; an aborted run publishes no completed
+summary. These files contain measurements, not game bytes. No per-frame log or
+file write happens during recording. JSON is published after its CSV; save the
+results elsewhere before starting another capture.
+
+After building/installing the intended debug APK and loading the checked model:
+
+```bash
+python3 scripts/benchmark_android.py --serial YOUR_ADB_SERIAL \
+  --output private/device/native-baseline --runs 3
+```
+
+Use a new output directory each time. The standard-library collector checks the
+installed APK hash against the local APK, records both asset hashes and display
+state, and starts a fresh viewer process for each run. It waits for the fixed
+capture, saves process-filtered logs and pulls the raw CSV and JSON. It refuses
+interrupted/restarted runs, missing completion evidence and non-mesh reports.
+Memory, battery and thermal snapshots are taken before warmup and after the
+report, outside the timed window. It does not install packages or change device
+settings. Snapshots and full logs belong under ignored private storage.
+
+Frame intervals run from one completion to the next, including event polling,
+update, GL submission, swap wait and the existing fallback delay when vsync is
+unavailable. Submit time covers the draw API calls and GL error check; swap time
+covers `SDL_GL_SwapWindow`. These are wall times, not GPU timer measurements or
+compositor presentation times. FPS is frame count divided by total interval
+time. Percentiles use nearest rank; threshold counts are strictly greater than
+the listed 16.67/33.33/50 ms limits. Raw nanosecond CSV values allow independent
+recalculation. Warmup and report-writing frames are excluded.
+
+Startup logs/report fields separately measure file read/decode, GL upload calls,
+native creation and native-main-to-first-successful-swap. They exclude Java/process
+startup before native main. Fresh process launches can still use warm OS file
+caches. `dumpsys meminfo` snapshots describe process memory at those points, not
+peak memory or a leak test. See [the native measurement record](verification/android.md#native-measurements) for
+actual device results and conditions.
+
 ## Build requirements
 
 - JDK 21. The included wrapper selects Gradle 8.9.
@@ -169,8 +216,8 @@ to the cube. No game asset is included in the APK.
 
 ## CPU tests
 
-The geometry, checkerboard, camera math, PNG and OBJ readers need neither SDL nor
-Android to test.
+The geometry, checkerboard, camera math, frame statistics, PNG and OBJ readers
+need neither SDL nor Android to test.
 The host PNG target uses the installed system zlib headers/library.
 With `ANDROID_HOME` pointing to the installed SDK:
 
@@ -194,11 +241,15 @@ stick dead zones and elapsed-time movement. It projects cube vertices and sphere
 samples across portrait/landscape aspects, camera angles and zoom limits. Touch
 cases cover tap jitter, drag, hold/reset, pinch, cancellation and extra fingers.
 
+The frame-statistics target checks known summaries and spikes, exact threshold
+boundaries, warmup exclusion, clock/stage errors, elapsed duration, cancellation
+and the sample cap.
+
 The mesh target checks original known positions, normals, UVs and face indices,
 framing through a full rotation at five aspect ratios, CRLF/comments/exponents,
 unsupported records, malformed faces, finite values, degeneracy, allocation
 limits and regular-file/symlink/FIFO restrictions. It also has a ten-second
-timeout. All four targets pass normally and with address/undefined-behaviour
+timeout. All five targets pass normally and with address/undefined-behaviour
 sanitizers. Device results and asset checksums are in
 [verification/android.md](verification/android.md#static-ball-model).
 

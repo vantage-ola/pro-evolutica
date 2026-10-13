@@ -58,6 +58,15 @@ their verification checks.
   Camera movement pauses rotation, and X/Options retain their
   existing actions. Four native test targets pass normally and with sanitizers;
   the APK builds offline. See [the camera checks](verification/android.md#camera-controls).
+- The viewer records bounded frame samples, startup stages and private CSV/JSON
+  results, with a repeatable ADB collector. The final portrait build measures
+  60.039 FPS over 60.011 seconds, p99 19.670 ms and a 25.509 ms maximum;
+  main-to-first-swap is 104.585 ms. Before/after process PSS is 98.97/94.30 MiB.
+  Five native targets pass normally and with sanitizers; the APK builds offline.
+  Input, resize and background cancellation are checked, including a corrected
+  SDL lifecycle event watch. This is one static scene, not game performance.
+  Conditions, earlier runs and rejected captures are in
+  [the measurement record](verification/android.md#native-measurements).
 - Android Gradle configuration passes offline with JDK 21 and cached build
   dependencies. The included Gradle 8.9 wrapper matches the official JAR hash.
 - Synthetic PE fixtures generated inside tests; no game executable or asset is
@@ -137,9 +146,9 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## Next three tasks
 
-1. Measure model load time, frame times and memory with a repeatable native run.
-   No sustained native FPS result is claimed yet.
-2. After those checks, select a skeleton/animation sample and document its
-   hierarchy, weights and timing before implementing it.
-3. Build original skeletal fixtures and compare one supported pose with an
+1. Select one skeleton/animation sample and document its hierarchy, weights and
+   timing before implementing deformation.
+2. Build original skeletal fixtures and compare one supported pose with an
    independent reference before real animation playback, following [PLAN.md](PLAN.md).
+3. Verify a short supported animation sequence, then use that evidence to update
+   the native-engine feasibility decision. General gameplay remains out of scope.

@@ -33,5 +33,8 @@ an independent reader exactly, including strip winding, normals and both UV
 sets. The portable reader and Android renderer now display it with the selected
 DXT1 colour texture. Source-byte checks and a separate visual reference agree;
 fallback, input and lifecycle checks pass. Orbit/zoom/reset now pass touch,
-PS4 and portrait/landscape checks. Continue with native measurements.
-Normal/specular shading and animation remain separate work.
+PS4 and portrait/landscape checks. Native measurements now establish a short
+static-scene baseline: 60.039 FPS, p99 19.670 ms and a 25.509 ms maximum interval
+in the final portrait APK. See [the measured conditions and limitations](verification/android.md#native-measurements).
+Continue by selecting and documenting one skeleton/animation sample before
+implementing deformation. Normal/specular shading remains separate work.
