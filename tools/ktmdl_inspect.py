@@ -139,6 +139,8 @@ def inspect_model(data: bytes) -> dict:
                 previous.pop(0)
         packets.append({"index": index, "primitive": "triangle_strip", "vertex_count": vertices,
                         "index_count": index_count, "vertex_stride": stride, "attributes": attributes,
+                        "packet_offset": packet, "vertex_data_offset": start,
+                        "index_data_offset": indices_start,
                         "position_bounds_min": lower, "position_bounds_max": upper,
                         "triangle_count_without_repeated_indices": triangles,
                         "repeated_index_windows": repeated, "restart_count": restarts})
@@ -150,7 +152,7 @@ def inspect_model(data: bytes) -> dict:
                            "triangle area, winding and animation are not validated."}
 
 
-def inspect_ktmdl(path: Path | str) -> dict:
+def read_model(path: Path | str) -> bytes:
     path = Path(path)
     fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
     with os.fdopen(fd, "rb") as source:
@@ -162,8 +164,12 @@ def inspect_ktmdl(path: Path | str) -> dict:
         if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != \
                 (after.st_size, after.st_mtime_ns, after.st_ctime_ns) or len(data) != before.st_size:
             raise ValueError("KTMDL input changed while reading")
-    report = inspect_model(data)
-    report["file_name"] = path.name
+    return data
+
+
+def inspect_ktmdl(path: Path | str) -> dict:
+    report = inspect_model(read_model(path))
+    report["file_name"] = Path(path).name
     return report
 
 

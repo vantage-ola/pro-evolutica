@@ -13,11 +13,11 @@ Command:
 Exact final output, also saved in [tools-tests.txt](tools-tests.txt):
 
 ```text
-........................................................................ [ 33%]
-........................................................................ [ 66%]
-........................................................................ [ 99%]
-.                                                                        [100%]
-217 passed in 1.32s
+........................................................................ [ 27%]
+........................................................................ [ 54%]
+........................................................................ [ 81%]
+................................................                         [100%]
+264 passed in 1.33s
 ```
 
 The test suite generates two-section PE fixtures in pytest temporary directories.
@@ -62,6 +62,14 @@ and primitives, truncated data, table overlap, invalid relative references,
 per-stream/aggregate caps, non-finite positions, out-of-range indices, strip
 restarts and repeated-index windows. File/CLI tests check stable reads,
 symlink/FIFO/directory refusal, JSON output and overwrite protection.
+
+The 47 static-export tests add original identity-bone/material/name fixtures
+and known normals, UVs and faces. They check strip parity through degenerate
+windows and restarts, exact OBJ indices, area and normal direction, finite
+attributes, missing normals/UVs, unsupported bones/skinning/morphs, bad metadata
+references/overlap, bounded names and export limits. CLI checks cover distinct
+exclusive outputs, format errors producing no OBJ, and direct script execution
+from another working directory. The reference reader is not a test dependency.
 
 ```bash
 .venv/bin/python -m pip check
@@ -198,8 +206,66 @@ The CLI returned 0 and agrees with a separate direct header/stream read on the
 comparisons use the same inferred layout and are not an independent geometry
 decoder. Both models pass the new inspector's bounded ranges, finite-position
 and index checks. `git check-ignore` confirms model files and full reports stay
-private. Model shape, winding, UV/material mapping and transforms still need an
-independent reference before a renderer relies on them.
+private. The independent comparison below extends these metadata checks.
+
+## Static export and independent comparison
+
+```bash
+.venv/bin/python tools/ktmdl_export.py \
+  --input private/extracted/dt0b-entry-00017.ktmdl \
+  --obj private/extracted/ball.obj --json private/reports/ball-static.json
+.venv/bin/python tools/pes_texture.py \
+  --input private/extracted/dt0b-entry-00017-model-cli.decoded.bin --index 1 \
+  --output private/extracted/ball-colour.dds \
+  --png private/extracted/ball-colour.png --json private/reports/ball-colour.json
+shasum -a 256 private/extracted/ball.obj private/extracted/ball-colour.dds \
+  private/extracted/ball-colour.png
+/usr/bin/sips -s format png private/extracted/ball-colour.dds \
+  --out private/extracted/ball-colour-reference.png
+```
+
+The CLIs returned 0; independent hashes agree with
+[the research record](../research/pes2013.md#static-ball-geometry-and-textures).
+The reviewed standalone reference at commit
+`0a0284fc9127beca45397ba7009883af2f2be6fd` was run without modification on the
+same model. All six vertex attributes, raw indices and ordered triangles agree
+exactly. Identity bone matrices and all three name/ID/mode/UV/parameter bindings
+also agree. The private report records 16 passing comparisons, including OBJ
+float32 round-trips and face indices. It is separate from the original-fixture
+pytest suite.
+
+To repeat the geometry comparison after reviewing the pinned reference source:
+
+```python
+import hashlib
+import importlib.util
+from pathlib import Path
+from tools.ktmdl_export import decode_static_model
+
+reference = Path("private/reference/ktmdl/ktmdl.py")
+assert hashlib.sha256(reference.read_bytes()).hexdigest() == \
+    "6dc2e924e9df136d72476343a0fd27feccac099fcdeb317ec9bcc49522d8ca63"
+spec = importlib.util.spec_from_file_location("reference_ktmdl", reference)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+data = Path("private/extracted/dt0b-entry-00017.ktmdl").read_bytes()
+report, mesh = decode_static_model(data)
+packet = module.parse_bytes(data)["packets"][0]
+for semantic, name in {16:"POSITION", 18:"NORMAL", 22:"TEXCOORD0",
+                       23:"TEXCOORD1", 30:"TANGENT", 31:"BINORMAL"}.items():
+    assert mesh["attributes"][semantic] == [v[name] for v in packet["vertices"]]
+assert mesh["indices"] == packet["indices"]
+assert mesh["triangles"] == packet["triangles"]
+print("682 vertices, 1748 indices, 1144 triangles: exact agreement")
+```
+
+The exported colour PNG and independent macOS DDS preview were decoded with
+the existing native PNG reader: 512 × 512, 1,048,576 RGBA bytes each. Maximum
+RGB error is 1/255, alpha matches exactly, and 13,416 channels differ. All assets,
+reference source and full reports remain ignored. Texture ID-to-bundle selection
+is a sample-specific inference supported by visual roles; final rendered UV
+alignment remains a device check. The flat model's debug-name layout failed in
+the pinned reference and is not claimed as a successful full decode.
 
 ## Review and limits
 
@@ -208,8 +274,9 @@ review. These checks verify diagnostics, AFS extraction, the observed WESYS/zlib
 wrapper and the supported flat DXT1 texture workflow on macOS ARM64. They do not
 verify script bytecode, other texture formats, full model rendering, REA/Ghidra,
 native rendering or device connectivity. The KTMDL checks additionally verify
-the supported geometry metadata on two local models; materials, UV values,
-triangle area and winding remain unverified. Details and hashes are in
+the supported geometry metadata on two local models and exact static ball
+geometry/reference agreement on entry 17. They do not verify general skeletons,
+animation, proprietary material shaders or Android model rendering. Details and hashes are in
 [the model research record](../research/pes2013.md#selected-ktmdl-model-samples).
 The manual Winlator report is recorded separately in
 [the phone baseline](../benchmarks/pes2013-baseline.md); sustained performance

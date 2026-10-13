@@ -52,6 +52,13 @@ Complete when the sample has plausible, checked geometry and an evidenced
 texture mapping. If the simplest sample is a flat quad, use it to validate the
 format, then choose a spatial model for the Android demonstration.
 
+Current result: the spatial sample is a ball. Its geometry and texture-reference
+metadata match a pinned independent reader; a checked local OBJ and DXT1 colour
+PNG exist. IDs and visual inspection support the sample's texture selection.
+The general bundle ID convention remains an inference, so selection stays
+explicit. The Android step must verify the texture's UV alignment visually.
+See [the research record](research/pes2013.md#static-ball-geometry-and-textures).
+
 ## Display the model on Android
 
 Replace the cube's fixed geometry with the supported sample. Keep the file

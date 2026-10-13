@@ -234,3 +234,37 @@ Limits: 64 MiB input, 4,096 records per geometry table, 1,000,000 vertices and
 all stream/declaration references stay within their declared regions. The reader
 rejects non-finite positions, out-of-range indices, final-path symlinks, special
 files, changing inputs and existing report paths. It uses only the standard library.
+
+## Export a supported static KTMDL packet
+
+```bash
+.venv/bin/python tools/ktmdl_export.py \
+  --input private/extracted/dt0b-entry-00017.ktmdl \
+  --obj private/extracted/ball.obj \
+  --json private/reports/ball-static.json
+```
+
+This builds on the inspector's checked stream offsets. It supports exactly one
+triangle-strip packet with float3 positions/normals and float2 UV0, no bones or
+one identity root bone, and no skinning, morphs or extra records. It converts
+strips to triangle lists: repeated-index windows consume parity, while `65535`
+restart markers reset it. It rejects zero-area faces, zero-length normals and
+non-finite attributes. Other supported vertex attributes are checked but are
+not written into OBJ. Limits: 65,535 vertices and 200,000 source indices.
+
+OBJ uses one-based `v/vt/vn` indices and nine significant digits to preserve
+float32 values. Source XYZ, units and UVs stay unchanged. No texture or MTL is
+written, and no game shader is recreated. A viewer must handle the image's row
+origin explicitly; the export does not decide which source axis represents up.
+
+The JSON adds triangle areas, winding agreement with normals, normal lengths,
+UV0 bounds, identity-bone status and packet texture references. Texture names,
+IDs, modes, UV channels and parameters are metadata, not automatic bundle
+selection. Known metadata tables and debug-name ranges are bounds-checked and
+must not overlap geometry. Unknown layouts can be refused even when the earlier
+geometry-only inspector accepts them.
+
+Both output paths must be new and distinct. Input/file errors follow the
+inspector's stable regular-file checks. A format error creates no output;
+a later write error may leave an earlier output, so discard outputs from a
+failed run. Keep converted game models under ignored `private/`.

@@ -27,3 +27,9 @@ model result. Animation and engine feasibility have their own verification
 checks in [PLAN.md](PLAN.md). A bounded inspector now checks geometry metadata
 for two local KTMDL samples. Model rendering and the proprietary engine remain
 unsupported until their respective results exist.
+
+The spatial sample is now identified as a ball. Its static OBJ geometry matches
+an independent reader exactly, including strip winding, normals and both UV
+sets. Material IDs and visual image checks support the selected DXT1 colour
+texture. Continue with portable mesh loading and the Android visual check;
+normal/specular shading and animation remain separate work.

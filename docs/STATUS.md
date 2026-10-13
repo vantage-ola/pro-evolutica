@@ -22,8 +22,14 @@ their verification checks.
   DDS extraction, mip metadata and a PNG preview of the largest level.
 - `tools/ktmdl_inspect.py`: bounded geometry metadata for observed little-endian
   KTMDL 2.1/2.2 triangle-strip packets. Real samples from `dt0b.img` have checked
-  geometry table ranges, finite positions and in-range indices. Rendering,
-  winding, materials and texture pairing remain unverified.
+  geometry table ranges, finite positions and in-range indices.
+- `tools/ktmdl_export.py`: one static packet exported to local OBJ with normals
+  and UV0. The selected ball's six vertex attributes, indices, triangle order,
+  identity bone and texture references match a pinned independent reader.
+  All 1,144 triangles have positive area and agree with the vertex normals.
+  Texture selection is supported by the IDs and visual checks of the three
+  bundle images; the binding convention remains sample-specific. Android model
+  rendering and the final visual UV check remain pending.
 - The native triangle runs on the Note20, with screenshot/log evidence for
   rendering, touch, PS4 X-button input, background/resume and Android Back.
 - The current native scene is a rotating textured cube with a local PNG or an
@@ -43,7 +49,7 @@ their verification checks.
   checked in. Tests cover PE32/PE32+, named/ordinal/delayed imports, malformed
   files, allocation limits, CLI errors and report overwrite protection. Inventory
   tests cover Unicode/CSV quoting, read errors and parent-symlink replacement.
-- **217 tests pass** on Python 3.11.9. Commands and results are in
+- **264 tests pass** on Python 3.11.9. Commands and results are in
   [verification/tools.md](verification/tools.md). Usage is in [TOOLS.md](TOOLS.md).
 - The phone gameplay report is recorded in
   [benchmarks/pes2013-baseline.md](benchmarks/pes2013-baseline.md). The reported
@@ -84,10 +90,13 @@ sample for a viewer. Its in-game use remains unknown; model work is recorded bel
 Mesh research has selected `dt0b.img` entry 35 (a four-vertex flat sample,
 KTMDL 2.1) and entry 17 (a spatial sample with 682 vertices, KTMDL 2.2).
 Their extracted model ranges match source bytes and independent SHA-256 checks.
-The inspector reports 1,748 indices for the spatial sample and 1,144 strip
-triangle windows without repeated indices. Triangle area, winding, texture
-references and the objects' in-game identity remain unverified. The scope and
-hashes are in [research/pes2013.md](research/pes2013.md).
+The spatial sample has 1,748 indices and 1,144 triangles. Its debug names and
+shader identify a ball, with colour, normal and specular references. A local
+114,904-byte OBJ preserves the source coordinates; its vertex/normal/UV values
+round-trip to the same float32 bytes. The selected 512 × 512 colour texture is
+DXT1; the normal texture is DXT5 and remains outside our decoder's supported
+subset. The pinned reference cannot decode the flat sample's debug-name layout.
+The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes2013.md).
 
 ## Phone result
 
@@ -113,9 +122,9 @@ hashes are in [research/pes2013.md](research/pes2013.md).
 
 ## Next three tasks
 
-1. Validate the selected spatial model's geometry, face winding and UVs against
-   an independent reference; keep converted geometry local.
-2. Establish its material/texture references and choose the supported diffuse
-   texture from evidence. Resolve unsupported variants separately.
-3. Load the verified model on the Note20. Add camera controls and measurements
-   after the model renders correctly, following [PLAN.md](PLAN.md).
+1. Add a bounded portable mesh reader using the checked static export and
+   original fixtures; keep unsupported models on the existing fallback scene.
+2. Show the ball and selected colour texture on the Note20, checking orientation,
+   UV alignment, culling, missing/damaged assets and background/resume.
+3. Add camera controls and measurements after the model renders correctly,
+   following [PLAN.md](PLAN.md).
