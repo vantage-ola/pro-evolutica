@@ -5,32 +5,34 @@ compatibility, translation or an evidenced native/hybrid implementation.
 The asset viewer supports that investigation. It is not the start of a separate
 football game with invented physics, AI or rules.
 
-Static ball rendering and one dense skeletal clip work on the Note20. The next
-step follows the original executable's file loading and platform boundaries.
-Initial reconnaissance now identifies import slots and archive-directory data,
-but this copy's main on-disk code remains unsuitable for confident function
-tracing. See [the executable record](research/pes2013-engine.md).
-The supplied Winlator installation copy and the executable installed in
-CrossOver have identical bytes. The Mac capture now verifies archive opens,
-successful read results and Wine graphics/audio/input module loads; the user
-confirms menu/match loading and normal exit. Exact archive read offsets and
-original caller functions remain unknown. The supplied Windows reference trace
-now adds read offsets/lengths and an exit status of 0; the user confirms a full
-match. A ball read matches our reference entry 17's offset and padded length.
-The PML now supplies the selected read's PES stack address `0x004f7a0e`, also
-present in most archive-read events, and additional archive-open addresses.
-The supplied PowerShell hash photo confirms the PC executable/archive match the
-inspected Mac inputs. Ghidra/REA installation and synthetic PE decompilation now
-pass verification, and REA is available in the chat. Ghidra default analysis
-finds no containing procedure at any captured frame; the imported byte windows
-match the unchanged source file. A debugger launch now observes a successful
-startup read correlated with `settings.dat`, including the original call site,
-arguments and result. Its runtime instruction bytes differ from the file.
-A subsequent capture connects `dt06.img` to its returned handle, seek to zero
-and successful 2,048-byte read through the Windows trace's common frame. The
-returned AFS prefix matches the local archive. Next establish the original
-file-reading routine's boundaries and return/error behaviour, then follow
-entry selection into payload reads; the containing routine is still unresolved.
+Static ball rendering and one dense skeletal clip work on the Note20. In the
+other track, the original PES 2013 game launches and loads a match in Winlator;
+the user reports a 60 FPS peak with persistent choppiness, and doubled or
+reverberant menu/crowd effects while music and commentary sound normal. That is
+playable evidence, not yet a reproducible performance result.
+
+Reverse-engineering has moved from archive inventory to a specific successful
+payload read. The Windows trace records `dt0b.img` at offset 5,992,448 for
+81,920 bytes, with PES return address `0x004f7a0e`. This aligns with AFS entry
+17's 81,872-byte WESYS object and the padded span to the next entry. The same
+address is the live `ReadFile` boundary observed under CrossOver for a 2,048-byte
+header read. Its successful path advances the reader and returns `1`; the error
+path, larger live read, and full containing routine remain unobserved. The
+existing decoded entry and Android ball viewer help validate the asset side of
+the chain, but they do not implement PES's engine.
+
+The Windows executable and archive hashes match the supplied Mac/CrossOver
+copies. Ghidra and REA are available, but default analysis finds no containing
+procedure at the captured PES addresses, and runtime call-site bytes differ
+from the on-disk copy. See [the executable and runtime evidence](research/pes2013-engine.md).
+
+Next capture the naturally occurring 81,920-byte read under WineDbg, correlate
+its handle with `dt0b.img`, and inspect its return through the shared read
+boundary. Then trace how that WESYS entry reaches the decoder/model loader and
+identify one original function with enough boundary and behavior evidence to
+compare against our existing parser. Use that comparison to choose between
+improving compatibility and building a small native/hybrid component; do not
+treat the viewer as a PES engine port.
 See [the stack evidence](research/pes2013-engine.md#captured-file-io-stack-addresses).
 Runtime observations establish platform boundaries and loading order, but do
 not recover function instructions by themselves. Android verification follows

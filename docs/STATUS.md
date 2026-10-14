@@ -267,7 +267,8 @@ No engine function or Windows frame-time measurement is claimed.
 
 ## Next tasks
 
-1. Follow archive entry selection into an actual payload read, recording its
-   index, offset, size and original caller.
-2. Specify and compare one small original function/subsystem before any native
-   replacement, then use that evidence to choose the next porting step.
+1. Capture the naturally occurring 81,920-byte read in WineDbg, correlate its
+   handle with `dt0b.img`, and inspect the successful return path.
+2. Trace the matching WESYS entry through the original decoder/model loader.
+   Recover one bounded function's inputs, outputs and control flow before
+   deciding whether a native/hybrid component is justified.
