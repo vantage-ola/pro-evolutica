@@ -22,21 +22,21 @@ existing decoded entry and Android ball viewer help validate the asset side of
 the chain, but they do not implement PES's engine.
 
 The Windows executable and archive hashes match the supplied Mac/CrossOver
-copies. Ghidra and REA are available, but default analysis finds no containing
-procedure at the captured PES addresses, and runtime call-site bytes differ
-from the on-disk copy. See [the executable and runtime evidence](research/pes2013-engine.md).
+copies. Ghidra maps the shared read-call address but cannot decode its on-disk
+bytes or assign a containing procedure. CrossOver's live Wine process executes
+a `ReadFile` call there, but this does not establish what native Windows runs
+at that address. See [the executable and runtime evidence](research/pes2013-engine.md).
 
 Use the existing Windows PML as the primary evidence for original-game file
 access: it already records the successful 81,920-byte `dt0b.img` read, its
 offset and length, and the PES stack address. The matching executable and
-archive hashes connect that trace to the inspected files. Continue from this
-address in Ghidra and relate it to the known WESYS entry and decoder. If the
-missing runtime instructions or register values become necessary, capture a
-bounded code window on native Windows; do not repeat the payload read under
-CrossOver just to reconfirm what the Windows trace already shows. Use CrossOver
-only to answer a Wine-specific comparison question. Winlator remains the place
-to measure and improve how the original game runs on Android. Do not treat the
-viewer as a PES engine port.
+archive hashes connect that trace to the inspected files. The next code-level
+step is a bounded native Windows debugger capture of the instructions around
+the call, plus `ReadFile` arguments and return. Procmon does not record those
+details. Do not repeat the payload read under CrossOver to reconfirm the file
+access. Use CrossOver only for Wine-specific comparisons and Winlator to
+measure and improve how the game runs on Android. The viewer is a research
+tool, not a PES engine port.
 See [the stack evidence](research/pes2013-engine.md#captured-file-io-stack-addresses).
 Runtime observations establish platform boundaries and loading order, but do
 not recover function instructions by themselves. Android verification follows

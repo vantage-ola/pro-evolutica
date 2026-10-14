@@ -499,8 +499,27 @@ routine boundary also remains unresolved. Captured live instructions and
 register/output values are in the ignored private finding; only this concise
 summary is public.
 
-Next follow archive entry selection into an actual payload read, recording its
-index, offset, size and original caller.
+#### On-disk bytes at the observed read call site
+
+Ghidra maps `0x004f7a08`, the six-byte instruction before the Windows PML return
+address, to file offset `0x000f6e08` in `.text`. The matching executable stores
+`4d 1f 10 ad 43 a0` there, which Ghidra marks undecodable; it also finds no
+containing procedure at `0x004f7a0e`. During the CrossOver run, WineDbg instead
+observed `ff 15 74 81 3f 01` at that address, a call through the `ReadFile`
+import slot `0x013f8174`. These facts show that the on-disk bytes and the live
+Wine instructions differ at this location. They do not establish why, and the
+Windows PML contains no instruction bytes or registers to determine whether the
+native Windows process has the same live instruction.
+
+The next code-level observation should use a native Windows debugger for a
+small window around this call site, with the `ReadFile` arguments and return
+value. The saved Procmon trace remains the source for which file range the
+Windows game reads. Another CrossOver capture would only answer a Wine-specific
+question. Ghidra mapping evidence and this bounded comparison are preserved in
+`private/research/engine/ghidra-callsite-01/`.
+
+Next capture the live call-site window and `ReadFile` arguments on native
+Windows; retain the Procmon log as the record of file path, offset and length.
 
 ### How REA and Ghidra fit this evidence
 

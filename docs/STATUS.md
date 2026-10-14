@@ -263,13 +263,17 @@ The bounded WineDbg capture follows the successful `0x800`-byte read path:
 it advances the reader cursor and returns `1` through an indirect callback.
 Only the success path was observed; the failure branch and full routine entry
 remain unresolved. See [the successful read return](research/pes2013-engine.md#observed-read-routine-return).
+At the shared call site, the source executable contains undecodable bytes,
+while WineDbg observed a `ReadFile` import call in CrossOver memory. Procmon's
+Windows stack identifies the return address but does not include live code
+bytes or registers, so the next code capture needs to come from native Windows.
 No engine function or Windows frame-time measurement is claimed.
 
 ## Next tasks
 
-1. Use the saved Windows PML/CSV and matching file hashes to trace the
-   `0x004f7a0e` payload-read site in Ghidra toward the WESYS decoder/model loader.
-2. If static evidence cannot expose the needed live instructions or register
-   values, capture only that bounded code window on native Windows. Reserve
-   CrossOver for Wine-specific comparison; use Winlator for Android play and
-   performance work.
+1. Capture a small native Windows code window at `0x004f7a08`, plus the
+   `ReadFile` arguments and return. Procmon already supplies the file path,
+   offset, length and stack return address.
+2. Use those instructions to follow the caller toward WESYS decoding and model
+   loading. Keep CrossOver for Wine-specific comparisons and Winlator for
+   Android play and performance work.
