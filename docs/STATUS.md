@@ -199,8 +199,11 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## REA, Ghidra and device status
 
-- REA and Ghidra were not found in the checked locations. Their versions and
-  provider/client `doctor` checks remain unverified.
+- Ghidra 12.1.4 and REA 6.4.0 are installed locally with a compiled ARM64
+  decompiler. Ghidra provider and Codex registration health checks pass.
+  A known synthetic x86 PE function decompiles correctly through the CLI and
+  saved MCP launcher. Restart Codex to load the new tools into this chat.
+  See [the installation verification](verification/engine-tooling.md).
 - ADB sees an authorised `SM_N981U` running Android 13/API 33. The native app
   reports Adreno 650/OpenGL ES 3.2 and a PS4 controller. Triangle and cube evidence
   is recorded in [verification/android.md](verification/android.md). The exact
@@ -240,10 +243,8 @@ No engine function or Windows frame-time measurement is claimed.
 
 ## Next three tasks
 
-1. Verify the Ghidra provider after the user's manual tool installation.
-   Installation and MCP connection have not been performed by the agent.
-2. Establish a readable code view to inspect one
-   original file-loading caller. REA/Ghidra setup remains unverified;
-   the on-disk code limitation remains unresolved.
+1. Reload Codex to expose the verified REA/Ghidra connection in the chat.
+2. Inspect the captured original file-loading addresses with Ghidra and determine
+   whether meaningful instructions can be recovered from the current on-disk copy.
 3. Specify and compare one small original function/subsystem before any native
    replacement, then use that evidence to choose the next porting step.

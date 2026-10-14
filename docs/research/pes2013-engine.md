@@ -85,11 +85,11 @@ which is not a multiple of the 28-byte entry layout in the
 That header issue and the `.text` interpretation are separate limitations.
 No header patch, unpacking, decryption or protection bypass was attempted.
 
-Ghidra and REA are not available in the checked locations. The installed JDK 21
-is usable, but no decompiler health check or game decompilation has passed.
-Official [Ghidra 12.1.4](https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_12.1.4_build)
-fits [REA's documented 12.1.x/JDK 21 requirements](https://rea.tools/get-started/#set-up-native-analysis).
-Installing it still requires approval under the repository specification.
+Ghidra 12.1.4 and REA 6.4.0 are now installed with the existing JDK 21 and
+bundled Node 24. The ARM64 decompiler, provider health check, Codex registration
+and synthetic PE decompilation through the saved MCP launcher are verified.
+See [the installation record](../verification/engine-tooling.md).
+No PES decompilation has been performed during setup.
 A decompiler alone will not establish meaningful instructions in transformed code.
 
 ## Next evidence required
@@ -350,7 +350,7 @@ table maps them to PES, and the matching PC executable fingerprint permits
 inspecting those locations in the Mac copy. No original code was executed,
 modified, unpacked or ported. The current on-disk code limitation remains.
 
-Next establish the analysis provider, then inspect
+Next inspect
 the instructions around these addresses and their evidenced callers. No new
 game capture is needed for the stack investigation.
 
@@ -368,8 +368,9 @@ For the candidate ball read, the objective is to connect an original caller
 address to its file/AFS loading logic, verify the inferred inputs and outputs,
 then compare a small portable equivalent with original behaviour. A caller stack
 can give an address to inspect; it does not by itself recover the function.
-No REA/Ghidra MCP tools are exposed in this session, and the earlier provider
-checks remain unverified. Installation/configuration has not been performed.
+Installation and provider/client health checks now pass. The saved MCP launcher
+decompiles a known synthetic PE function correctly. Restart Codex to expose the
+new tools in this chat; direct CLI and MCP analysis already work.
 The current on-disk code limitation still applies: logging and an MCP connection
 do not make transformed bytes readable or automatically port the game.
 

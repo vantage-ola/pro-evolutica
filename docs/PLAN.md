@@ -20,8 +20,9 @@ match. A ball read matches our reference entry 17's offset and padded length.
 The PML now supplies the selected read's PES stack address `0x004f7a0e`, also
 present in most archive-read events, and additional archive-open addresses.
 The supplied PowerShell hash photo confirms the PC executable/archive match the
-inspected Mac inputs. Next inspect the corresponding original instructions with
-a verified analysis provider after the user's manual tool installation.
+inspected Mac inputs. Ghidra/REA installation and synthetic PE decompilation now
+pass verification. Next inspect the corresponding original instructions with
+that provider; restart Codex to expose its MCP tools in this chat.
 See [the stack evidence](research/pes2013-engine.md#captured-file-io-stack-addresses).
 Runtime observations establish platform boundaries and loading order, but do
 not recover function instructions by themselves. Android verification follows
