@@ -96,9 +96,10 @@ A decompiler alone will not establish meaningful instructions in transformed cod
 
 The supplied installation copy is identical. CrossOver and Windows file-activity
 captures now pass the checks below. The Windows trace supplies archive read
-offsets, and its saved PML now supplies matched stack addresses. Next verify the
-PC executable/archive fingerprints and inspect the corresponding original code
-with a working analysis provider. The prepared Winlator procedure remains an alternative.
+offsets, and its saved PML now supplies matched stack addresses. Next inspect
+the corresponding original code with a working analysis provider. The supplied
+PC hash photo now confirms both fingerprints match the inspected inputs.
+The prepared Winlator procedure remains an alternative.
 
 Capture a short, clearly labelled run from launch to the menu, then one match
 load, using supported logging if available. Keep logs private and distinguish
@@ -287,17 +288,22 @@ In that reference archive, entry 17 begins at 5,992,448 and contains 81,872 byte
 entry 18 begins 81,920 bytes later. A separate direct AFS header/table read
 confirms those values. This is the entry used for the native ball viewer.
 The offset and length therefore support an entry-17 loading candidate in the
-original Windows game. PC archive equality and the displayed ball choice remain
-unproven until its archive hash and visual context are checked. The trace does
-not show returned file contents or model-decoding instructions.
+original Windows game. The user's PowerShell hash photo confirms PC archive
+equality; the displayed ball choice remains unverified. The trace does not show
+returned file contents or model-decoding instructions.
 
 The selected read occurs about 105.320 seconds after process start, but no stage
 marker labels it as kickoff. `dt10.img` has only two observed reads, both 2,048
 bytes at offset 0; this alone cannot establish script execution or non-use.
 
 The CSV has no thread IDs or caller stacks. The saved PML's selected stacks are
-now decoded and cross-checked below. Obtain the PC `pes2013.exe` and `dt0b.img`
-SHA-256 values before assigning existing code addresses or entry identity.
+now decoded and cross-checked below. The supplied PowerShell photo reports
+`pes2013.exe` SHA-256
+`5b1dd4fc86b6e92696762caa0f92e4e59f026858131d1be6a0418d1d2b275694`
+and `dt0b.img` SHA-256
+`e77dddd5fb9df4362bf71ec16530ed6af4af748f9a9eba1ee73b71e1ebd13ad1`.
+Both match the inspected Mac inputs. This is user-supplied PC hash evidence,
+not a direct inspection of the PC files. The photo is preserved privately.
 
 Bounded snapshots and before/after metadata checks protect the inspection from
 input changes. Dictionary-based CSV totals agree with a separate positional-row
@@ -340,11 +346,11 @@ separate observed paths; no loading-thread roles or function names are assigned.
 
 Captured stack addresses may be return addresses. They are not proven function
 entries, complete call graphs or recovered instructions. The Windows module
-table maps them to PES, but the PC executable fingerprint is still required
-before inspecting those locations in the Mac copy. No original code was executed,
+table maps them to PES, and the matching PC executable fingerprint permits
+inspecting those locations in the Mac copy. No original code was executed,
 modified, unpacked or ported. The current on-disk code limitation remains.
 
-Next compare the two PC hashes, establish the analysis provider, then inspect
+Next establish the analysis provider, then inspect
 the instructions around these addresses and their evidenced callers. No new
 game capture is needed for the stack investigation.
 

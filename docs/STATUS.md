@@ -226,8 +226,9 @@ No Mac performance measurement or original engine function is claimed.
 The user confirms menu, kickoff, a full match and exit from the game's menu.
 The supplied CSV has 28,253 PES-only events, 19 successfully opened archives,
 explicit read offsets/lengths and a process exit status of 0. One ball-archive
-read matches the offset and padded length of the viewer's reference entry 17;
-PC archive/executable hashes are still needed to confirm that mapping.
+read matches the offset and padded length of the viewer's reference entry 17.
+The supplied PowerShell hash photo confirms the PC archive and executable match
+the inspected Mac inputs. The displayed ball choice remains unverified.
 CSV/PML inputs were moved unchanged from the root into ignored `private/`.
 CSV counts and the reference AFS table were cross-checked. A bounded local PML
 inspection now matches all CSV timestamps and read ranges and extracts the
@@ -239,10 +240,10 @@ No engine function or Windows frame-time measurement is claimed.
 
 ## Next three tasks
 
-1. Obtain PC executable and ball-archive SHA-256 values before applying the
-   recovered stack addresses to the inspected copy. No new capture is needed.
-2. Establish a readable code view and verified analysis provider to inspect one
+1. Verify the Ghidra provider after the user's manual tool installation.
+   Installation and MCP connection have not been performed by the agent.
+2. Establish a readable code view to inspect one
    original file-loading caller. REA/Ghidra setup remains unverified;
-   installation requires approval.
+   the on-disk code limitation remains unresolved.
 3. Specify and compare one small original function/subsystem before any native
    replacement, then use that evidence to choose the next porting step.
