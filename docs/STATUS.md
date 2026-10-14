@@ -208,22 +208,27 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 ## Mac runtime investigation
 
-The user reports that PES 2013 launches after installation inside CrossOver.
+The user confirms menu and match loading, then normal exit, inside CrossOver
+with the Wine Graphics setting.
 Local metadata identifies CrossOver 26.2, build `26.2.0.39821`, and a `PES 2013`
 bottle. Its installed executable has the same size, SHA-256 and reconnaissance
 report as the previously inspected copies; independent `shasum` agrees.
-Menu/match loading and runtime file/DLL logs remain pending. A private capture
-directory and [CrossOver instructions](research/pes2013-engine.md#crossover-launch-and-capture)
-are prepared. No Mac gameplay/performance result or engine function is claimed.
+The preserved file/DLL log is verified: 66 archive-open requests across 16
+archives and 2,956 explicit successful read results in the PES Wine process.
+The opened ball archive's hash/table match the previous research input. One
+early WineD3D `glClear` error has unknown impact; it did not prevent the user's
+reported menu/match run. File offsets and original caller functions are absent.
+See [the capture findings](research/pes2013-engine.md#verified-crossover-capture).
+No Mac performance measurement or original engine function is claimed.
 
 ## Next three tasks
 
-1. Capture a short CrossOver launch/menu and match-loading run with file/DLL
-   logging. The user reports launch succeeds; full loading and log coverage
-   still need evidence. Preserve the working installations.
-2. Inspect the captured format and PES file/API records before building a parser.
-   Record observed files/arguments separately from hypotheses. A readable code
-   view and verified analysis tool are still needed to recover functions;
+1. Obtain a short Windows 11 reference capture and executable fingerprint from
+   the user's gaming PC. The PC can stay offline; transfer tools and results by
+   USB using [the procedure](research/pes2013-engine.md#windows-reference-capture-including-an-offline-pc).
+2. Inspect file offsets/lengths and available operation stacks for one archive
+   path. Compare fingerprints before reusing addresses. A readable code view
+   and verified analysis tool are still needed to recover functions;
    Ghidra installation requires approval.
 3. Specify and compare one small original function/subsystem before any native
    replacement, then use that evidence to choose the next porting step.

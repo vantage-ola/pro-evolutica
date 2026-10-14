@@ -94,10 +94,10 @@ A decompiler alone will not establish meaningful instructions in transformed cod
 
 ## Next evidence required
 
-The supplied installation copy is identical. The user has chosen the Mac for
-runtime investigation and reports that PES launches after installation inside
-CrossOver. The next evidence is a short file/DLL log from that installation;
-the prepared Winlator procedure below remains an alternative.
+The supplied installation copy is identical. A CrossOver file/DLL capture now
+passes the checks below. The next capture is a Windows 11 reference run supplied
+by the user, seeking archive read offsets and operation stacks. The prepared
+Winlator procedure remains an alternative.
 
 Capture a short, clearly labelled run from launch to the menu, then one match
 load, using supported logging if available. Keep logs private and distinguish
@@ -114,9 +114,9 @@ that bottle is 19,916,288 bytes with the same SHA-256 as the inspected copies.
 An independent `shasum` agrees, and the complete reconnaissance reports compare
 equal. Installation has not provided a different static code view.
 
-The user reports **launch succeeds**. Menu, match loading, gameplay, graphics
-settings, dependencies and performance have not yet been recorded. This is a
-manual launch result, not an agent-observed gameplay test.
+The user confirms **menu and match loading succeed, followed by a normal exit**,
+using the **Wine** Graphics setting. These are manual results. Mac frame times,
+audio behaviour and sustained performance have not been measured.
 
 For the first capture:
 
@@ -135,12 +135,105 @@ This workflow is documented in
 Use a new directory for each run. Logging can affect timing and generate large
 output; this short diagnostic is not a performance measurement. First inspect
 the actual log format and confirm PES file activity before implementing a
-parser or drawing loading conclusions. No runtime capture has passed yet.
+parser or drawing loading conclusions. The first capture is verified below.
 
 Mac logs can establish observed archive access and compatibility calls. They
 cannot establish Android rendering/performance or supply missing engine
 instructions. Device verification follows an implemented component; it is not
 required to collect this Mac research log.
+
+### Verified CrossOver capture
+
+The completed log contains 35,317,436 bytes and 367,138 lines, SHA-256
+`77ffdee51d290783f013300816718bc588534f872eec8bf4c9b1a2bf351fec39`.
+A bounded regular-file snapshot was checked for changes during reading; an
+independent hash confirms the preserved copy matches. Raw logs and the detailed
+summary remain in ignored `private/research/engine/crossover-capture-01/`.
+
+Line 15,954 loads `pes2013.exe` at `0x00400000` under Wine process ID `0110`.
+Counts below include that Wine process only, excluding startup/service processes.
+The ID is not a macOS PID. Its trace spans 427.060 seconds; there are no stage
+markers or frame samples, so this duration is not a gameplay benchmark.
+
+- 66 `CreateFileW` requests open 16 distinct `dt*.img` archives. Each paired
+  return supplies a non-invalid handle. First requests occur in this order:
+  `dt06`, `dt03`, `dt01`, `dt02`, `dt04`, `dt07`, `dt08`, `dt09`, `dt0a`,
+  `dt0b`, `dt0c`, `dt0d`, `dt0e`, `dt10`, `dt11`, `dt0f`.
+- 2,956 `ReadFile` requests and 2,963 `NtReadFile` requests are recorded, with
+  2,956 explicit `NtReadFile = SUCCESS` results. These API layers overlap and
+  must not be added as distinct reads. Missing result lines do not prove failure.
+- 65 module-load events include Wine's built-in `d3d9.dll`, `wined3d.dll`,
+  `opengl32.dll`, `DSOUND.dll`, `DINPUT8.dll`, `XINPUT9_1_0.dll` and
+  `winecoreaudio.drv`. This supports the reported Wine graphics setting.
+  Repeated loads are events, not necessarily distinct modules. Loader terminology
+  `native` describes Windows PE modules, not Android ARM64 code.
+
+One narrow sequence is directly visible: line 38,260 requests `dt0b.img`, line
+38,266 returns handle `0x294`, and lines 38,269–38,271 request and successfully
+read 2,048 bytes. The installed archive passes the existing AFS inspector:
+11,028,480 bytes, 37 slots, one empty, SHA-256
+`e77dddd5fb9df4362bf71ec16530ed6af4af748f9a9eba1ee73b71e1ebd13ad1`.
+Its hash and complete entry metadata match the earlier ball-archive report.
+
+The trace does not reveal the seek buffer's file-position value. The null offset
+pointer in `NtReadFile` is not evidence of offset zero. Handles are reused across
+archives and close events are absent, so later reads on `0x294` cannot all be
+attributed to the ball. No particular AFS entry, displayed asset or original
+caller function is established by this sequence.
+
+The game process has one `err` event: line 23,099 reports
+`GL_INVALID_FRAMEBUFFER_OPERATION (0x506)` from `glClear`, before the first archive
+open. Its impact is unknown; the user confirms subsequent menu/match loading and
+normal exit. Line 366,732 records `LdrShutdownProcess`, consistent with that exit.
+This error does not establish a crash or explain the separate Winlator stutter.
+Wine warnings, handled exceptions and compatibility calls are not recovered
+engine instructions. No original function has been ported.
+
+### Windows reference capture, including an offline PC
+
+The user has a Windows 11 gaming PC. It need not be online or remotely connected
+to collect a local trace. Download the official
+[Process Monitor ZIP](https://learn.microsoft.com/en-us/sysinternals/downloads/procmon)
+on a connected machine and transfer it by USB. The checked release is 4.11;
+its supported client is Windows 11 or newer. It records operation parameters and
+thread stacks, and PML preserves the native event data for later inspection.
+
+For the first run, capture launch → main menu → one exhibition match → normal
+exit. A broader tour of game modes can follow once this trace is usable.
+
+1. Extract the ZIP. On an x64 PC, run `Procmon64.exe` as administrator. Accept
+   the licence if prompted. Stop the initial capture using **File → Capture Events**.
+2. Reset existing filters, then add **Process Name → is → pes2013.exe → Include**.
+   Clear the initial events with **Edit → Clear Display**. Keep file-system and
+   process/thread activity enabled so archive reads and module loads are available.
+3. Start capture, launch PES, reach its menu and load a match. Play briefly, then
+   exit normally and stop capture. Note approximate clock times for menu, kickoff
+   and exit, teams/stadium selected, graphics settings, and any visible problems.
+4. Use **File → Save** and select **Events displayed using current filter**.
+   Save `pes2013-pc-01.pml` in native PML format. Save the same filtered events
+   again as `pes2013-pc-01.csv`; keep the **Detail** column in the CSV.
+5. In PowerShell opened in the actual PES installation directory, fingerprint
+   the executable without changing it:
+
+   ```powershell
+   Get-FileHash -LiteralPath '.\pes2013.exe' -Algorithm SHA256 |
+       Format-List | Out-File -Encoding utf8 '.\pes2013-exe-sha256.txt'
+   ```
+
+6. Transfer the PML, CSV, hash text and a short `notes.txt` by USB. Retain the
+   original capture on the PC. Full logs belong in ignored `private/` on the Mac.
+
+Microsoft documents [capture, elevation and saving native logs](https://learn.microsoft.com/en-us/troubleshoot/windows-client/shell-experience/troubleshoot-apps-start-failure-use-process-monitor).
+This project deliberately exports only the filtered PES events. Capture overhead
+means this run is not a performance benchmark. CSV enables analysis with the
+existing Mac tools; retain PML for richer event/stack inspection on Windows.
+An offline stack may contain module addresses without resolved symbols.
+
+Compare the PC executable hash before reusing Mac addresses. Inspect observed
+read offsets/lengths and available stacks for one archive path first. File/API
+logs cannot provide all simulation, AI or rendering behaviour; subsequent
+captures should answer a specific unresolved question. The Windows procedure
+is prepared, not yet tested on the user's PC.
 
 ### Prepare a short Wine log
 
@@ -189,7 +282,7 @@ parser. A successful pull alone does not verify tracing. Identify observed
 archive opens, read/seek operations and loaded modules where the log supports
 them; leave internal gameplay roles and callers unknown.
 
-No runtime capture has passed yet. The latest ADB connection check lists no
+No Winlator runtime capture has passed yet. The latest ADB connection check lists no
 device; the user has been given the capture steps. No logging setting or game
 file has been changed by the agent.
 

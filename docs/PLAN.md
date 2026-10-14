@@ -11,11 +11,15 @@ Initial reconnaissance now identifies import slots and archive-directory data,
 but this copy's main on-disk code remains unsuitable for confident function
 tracing. See [the executable record](research/pes2013-engine.md).
 The supplied Winlator installation copy and the executable installed in
-CrossOver have identical bytes. The user reports that PES launches in CrossOver
-on the Mac. Capture a short launch/menu and match-loading log there first.
-Runtime observations can establish platform boundaries and loading order, but
-do not recover function instructions by themselves. Android verification follows
-an implemented component; Mac investigation can proceed independently.
+CrossOver have identical bytes. The Mac capture now verifies archive opens,
+successful read results and Wine graphics/audio/input module loads; the user
+confirms menu/match loading and normal exit. Exact archive read offsets and
+original caller functions remain unknown. Next obtain a short Windows 11
+reference capture from the user's offline gaming PC, with its executable hash.
+See [the findings and capture steps](research/pes2013-engine.md#verified-crossover-capture).
+Runtime observations establish platform boundaries and loading order, but do
+not recover function instructions by themselves. Android verification follows
+an implemented component; runtime research can proceed independently.
 
 Advance after verified results or an explicit blocker and revised approach.
 Keep the working Winlator installation available for the original game. The
