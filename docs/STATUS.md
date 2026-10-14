@@ -210,7 +210,9 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 
 1. Confirm the installed Winlator version and supported file/API logging. The
    supplied installation copy has the same executable bytes; static tracing
-   remains limited. Preserve the working installation.
+   remains limited. The [short capture procedure](research/pes2013-engine.md#prepare-a-short-wine-log)
+   is prepared from upstream source; the installed build and captured output
+   remain unverified. Preserve the working installation.
 2. Capture a short launch/menu and match-loading trace with a stated method.
    Record observed files/API arguments separately from hypotheses. A readable
    code view and verified analysis tool are still needed to recover functions;

@@ -107,6 +107,57 @@ identify platform boundaries and loading order; it cannot supply original
 function instructions or justify a gameplay rewrite. State the chosen logging
 method, limits and effect on performance before capturing it.
 
+### Prepare a short Wine log
+
+Wine handles the game's Windows API calls. Its file-access and DLL-loading
+debug channels can expose some of those calls while the original game runs.
+This is an observation at the compatibility boundary, not an instruction trace
+of the PES engine. Coverage depends on the Wine build and selected channels.
+
+The current upstream Winlator source provides the following controls; confirm
+that the installed version has them before treating these steps as verified:
+
+1. Exit the running container. Record the Winlator version and existing logging
+   settings so they can be restored afterward.
+2. Open Winlator's main **Settings**. Enable **Wine debug**, and add **file** and
+   **loaddll** to the Wine debug channels. Leave Box64 logging off for this run.
+3. Enable **Save logs to file** and record the displayed output path. Save the
+   settings, then restart the container so Wine receives the new channels.
+4. Launch PES, reach its menu, load one match and stop after kickoff. Keep the
+   run short; if loading or logging becomes unusable, exit and report that result.
+   Note the actions and any errors. This diagnostic run is not an FPS benchmark.
+5. Exit the container and copy the log before launching another session. Restore
+   the previous logging settings when finished.
+
+Upstream's default output is `Documents/Winlator/logs.txt`; use the path actually
+shown by the installed build. Its log writer replaces the previous file when a
+new log view is created, so preserve each capture before another launch.
+These settings and behaviour are supported by the upstream
+[settings implementation](https://github.com/brunodev85/winlator-app/blob/main/app/src/main/java/com/winlator/SettingsFragment.java),
+[channel selection](https://github.com/brunodev85/winlator-app/blob/main/app/src/main/assets/wine_debug_channels.json),
+[Wine environment setup](https://github.com/brunodev85/winlator-app/blob/main/app/src/main/java/com/winlator/XServerDisplayActivity.java)
+and [log writer](https://github.com/brunodev85/winlator-app/blob/main/app/src/main/java/com/winlator/widget/LogView.java).
+
+With USB debugging authorised, copy the completed default-path log to a new
+ignored research directory on the Mac:
+
+```bash
+mkdir private/research/engine/winlator-capture-01
+adb pull /sdcard/Documents/Winlator/logs.txt private/research/engine/winlator-capture-01/logs.txt
+shasum -a 256 private/research/engine/winlator-capture-01/logs.txt
+```
+
+Choose a new directory for each capture. If the displayed phone path differs,
+substitute it in `adb pull`. Keep full logs private. First inspect the captured
+format and confirm that PES file operations are present before writing a log
+parser. A successful pull alone does not verify tracing. Identify observed
+archive opens, read/seek operations and loaded modules where the log supports
+them; leave internal gameplay roles and callers unknown.
+
+No runtime capture has passed yet. The latest ADB connection check lists no
+device; the user has been given the capture steps. No logging setting or game
+file has been changed by the agent.
+
 If another executable becomes available, fingerprint it independently before
 assuming readable code or matching addresses. Once a readable code view and
 working analysis tool exist, trace an archive-record consumer or file-I/O caller
