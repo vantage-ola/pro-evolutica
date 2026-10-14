@@ -26,8 +26,11 @@ finds no containing procedure at any captured frame; the imported byte windows
 match the unchanged source file. A debugger launch now observes a successful
 startup read correlated with `settings.dat`, including the original call site,
 arguments and result. Its runtime instruction bytes differ from the file.
-Next connect an archive read to its filename/handle, range and original caller;
-the containing routine is still unresolved.
+A subsequent capture connects `dt06.img` to its returned handle, seek to zero
+and successful 2,048-byte read through the Windows trace's common frame. The
+returned AFS prefix matches the local archive. Next establish the original
+file-reading routine's boundaries and return/error behaviour, then follow
+entry selection into payload reads; the containing routine is still unresolved.
 See [the stack evidence](research/pes2013-engine.md#captured-file-io-stack-addresses).
 Runtime observations establish platform boundaries and loading order, but do
 not recover function instructions by themselves. Android verification follows

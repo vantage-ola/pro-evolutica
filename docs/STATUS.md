@@ -248,17 +248,24 @@ returned 852, with a prefix matching local `settings.dat`. The call site at
 `0x004e7b3b` uses the expected import and differs from its on-disk bytes.
 File identity is correlated, not established by a live handle-name query.
 Late attachment faults in this setup; launching under the debugger works.
-Breakpoints were removed, the debugger detached, PES remains running and the
-user confirms it responds normally.
+Breakpoints were removed, the debugger detached, PES remained running and the
+user confirmed it responded normally.
+A second debugger launch directly connects `dt06.img`'s filename to a returned
+handle, successful seek to zero, and successful 2,048-byte read through the
+Windows trace's common frame `0x004f7a0e`. Its AFS prefix matches the local
+archive, whose 1,442-entry table passes the existing inspector. Three runtime
+API call sites differ from their on-disk bytes. All breakpoints were removed;
+the user confirms normal response and exit, and PES is no longer running.
 See [the Ghidra check](research/pes2013-engine.md#ghidra-check-of-the-captured-frames).
 See [the runtime observation](research/pes2013-engine.md#runtime-file-read-observation).
+See [the archive call chain](research/pes2013-engine.md#runtime-archive-open-seek-and-read).
 No engine function or Windows frame-time measurement is claimed.
 
 ## Next three tasks
 
-1. Observe an archive read under the verified debugger launch, connecting its
-   filename/handle and range with the original caller and result.
-2. Establish an evidenced original routine and its inputs/outputs from those
-   observations; Ghidra has not recovered it from the current on-disk copy.
+1. Bound the original routine around the observed `ReadFile` call and trace its
+   return/error behaviour and interface; the full routine remains unresolved.
+2. Follow archive entry selection into an actual payload read, recording its
+   index, offset, size and original caller.
 3. Specify and compare one small original function/subsystem before any native
    replacement, then use that evidence to choose the next porting step.

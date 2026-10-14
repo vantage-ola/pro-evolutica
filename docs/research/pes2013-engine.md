@@ -427,8 +427,57 @@ running. The user confirms the game responds normally afterward.
 Commands, diagnostics, the fixture probe and checked findings stay ignored in
 `private/research/engine/crossover-debugger-01/`. No process image was dumped,
 no protection was bypassed, and no native replacement was implemented.
-Next observe an archive read with its filename/handle and range, then establish
-the original caller's boundaries and behaviour before specifying a port.
+The archive observation below follows that boundary with a directly observed
+filename, handle and seek position.
+
+### Runtime archive open, seek and read
+
+A second launch under `system32\winedbg.exe`, with `+file` diagnostics,
+captures one startup read from `img/dt06.img`. The filename is read directly
+from `CreateFileA`'s argument, and its returned handle is followed through the
+seek and read. The loaded PES base remains `0x00400000`; Wine process `0x00e4`
+and thread `0x0164` identify the corresponding file-log events.
+
+- Open: return address `0x004f779e`, read access, existing file, sharing value
+  `3`, flags `0x08000000`; result handle `0x264`. Wine's paired `CreateFileW`
+  diagnostic records the same archive and returned handle.
+- Seek: return address `0x005057a8`, handle `0x264`, distance low/high both
+  zero and method `FILE_BEGIN`. The result low/high are also zero.
+- Read: return address `0x004f7a0e`, handle `0x264`, requested 2,048 bytes,
+  null overlapped pointer. At return, `EAX = 1` and the byte-count output is
+  2,048. Wine independently records `NtReadFile = SUCCESS (2048)`.
+
+This establishes the range `[0, 2048)`. Offset zero comes from the observed
+seek and result, rather than assuming a null overlapped pointer means zero;
+[ReadFile uses the current position for this synchronous call](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-readfile).
+Close/reopen breakpoints monitor handle reuse; neither interrupts the observed
+open-to-read chain. Seek/read return stops are constrained to their expected
+post-call stack positions to avoid confusing another thread's return.
+
+The returned 16-byte prefix begins with `AFS` and matches the archive's on-disk
+prefix. Its entry count is 1,442; the existing AFS inspector validates the table.
+The archive is 131,594,240 bytes, SHA-256
+`4825704596316e728d2a9bd1cfa945b0abcedbdad5ed0ad06f378723f194860b`.
+This is an initial header/table block, not a selected asset payload or decoder.
+
+Six-byte runtime call sites at `0x004f7798`, `0x005057a2` and `0x004f7a08`
+call through the expected `CreateFileA`, `SetFilePointer` and `ReadFile` import
+slots respectively. All differ from their independently mapped on-disk bytes;
+the executable fingerprint remains unchanged. The read return address agrees
+with the common frame from the Windows archive trace. These observations connect
+the captured addresses to actual API behaviour; containing function boundaries
+and full instruction flow remain unresolved. The automatic backtrace omits the
+direct seek/read caller, so the raw stack return addresses supply that evidence.
+
+All breakpoints/watchpoints were absent before detachment. PES remained running,
+and the user confirms it responded normally and then exited through its menu.
+Process enumeration confirms PES is absent afterward. Diagnostics and checked
+findings stay ignored in `private/research/engine/crossover-archive-01/`.
+Debugger pauses make this unsuitable for performance measurement. No native
+replacement or process-image dump was produced.
+
+Next bound the original file-reading routine around the observed call and trace
+its return/error behaviour, then follow archive entry selection into payload reads.
 
 ### How REA and Ghidra fit this evidence
 
