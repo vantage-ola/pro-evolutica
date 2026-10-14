@@ -96,8 +96,9 @@ A decompiler alone will not establish meaningful instructions in transformed cod
 
 The supplied installation copy is identical. CrossOver and Windows file-activity
 captures now pass the checks below. The Windows trace supplies archive read
-offsets. Next verify its executable/archive fingerprints and inspect one read's
-caller stack. The prepared Winlator procedure remains an alternative.
+offsets, and its saved PML now supplies matched stack addresses. Next verify the
+PC executable/archive fingerprints and inspect the corresponding original code
+with a working analysis provider. The prepared Winlator procedure remains an alternative.
 
 Capture a short, clearly labelled run from launch to the menu, then one match
 load, using supported logging if available. Keep logs private and distinguish
@@ -294,17 +295,58 @@ The selected read occurs about 105.320 seconds after process start, but no stage
 marker labels it as kickoff. `dt10.img` has only two observed reads, both 2,048
 bytes at offset 0; this alone cannot establish script execution or non-use.
 
-The CSV has no thread IDs or caller stacks. PML was preserved, size/hash checked
-and its `PML_` signature checked, but its events/stacks have not been decoded on
-this Mac. Next inspect the stack for the `dt0b.img` read at
-`00:00:19.2899644` in Process Monitor. Record available module addresses/offsets;
-symbols may remain unresolved. Obtain the PC `pes2013.exe` and `dt0b.img`
+The CSV has no thread IDs or caller stacks. The saved PML's selected stacks are
+now decoded and cross-checked below. Obtain the PC `pes2013.exe` and `dt0b.img`
 SHA-256 values before assigning existing code addresses or entry identity.
 
 Bounded snapshots and before/after metadata checks protect the inspection from
 input changes. Dictionary-based CSV totals agree with a separate positional-row
 count. Analysis code and detailed records stay private; no parser dependency or
 new production tool was added.
+
+### Captured file-I/O stack addresses
+
+A capture-specific standard-library reader inspected the saved PML v9 without
+installing a package. Layout references were the
+[procmon-parser format notes](https://github.com/eronnen/procmon-parser/blob/main/docs/PML%20Format.md)
+and [reader source](https://github.com/eronnen/procmon-parser/blob/main/procmon_parser/stream_logs_format.py),
+with its [MIT licence](https://github.com/eronnen/procmon-parser/blob/main/LICENSE)
+reviewed. These are reverse-engineered layouts, not an official Microsoft
+specification. Input size, table counts, ranges and stack depths are bounded;
+hashes and before/after file metadata agree with the preserved inputs.
+The narrow analysis script and full outputs stay ignored beside the capture.
+
+The PML contains 241,842 events across multiple processes, rather than just the
+CSV's filtered PES records. Only PES is interpreted here. Its process-table
+index is `555`, PID `15116`, recorded as a 32-bit process. There are 29,450 PES
+events: excluding 1,197 profiling events leaves exactly the CSV's 28,253 records.
+All relative timestamps agree to their 100 ns precision, with no discrepancies.
+All 5,328 read offsets/lengths match the CSV. Another 7,609 filesystem paths match
+exactly; 103 directory-query records match their directory prefix, with returned
+child-name decoding outside this reader's scope.
+
+The selected ball read, CSV event 26,041, is PML event **48,713**, record offset
+`0x00d3a249`. It runs on thread `2788` and has 18 captured stack addresses.
+The captured user addresses pass through WOW64, `ntdll.dll` and
+`KernelBase.dll`; the PES frame is **`0x004f7a0e`**, or **RVA `0x000f7a0e`**
+relative to the recorded `0x00400000` image base. The same PES frame appears in
+5,063 of 5,068 archive-read events; five have no captured PES frame. A shared
+file-reading boundary is the working interpretation, not a ball decoder label.
+
+The earlier ball opens, CSV events 21,457 and 21,461, also run on thread `2788`.
+They capture PES addresses **`0x004f779e`** and **`0x004dc625`**. The later open,
+event 21,903, runs on thread `8912` and captures **`0x00504b7f`**. These are
+separate observed paths; no loading-thread roles or function names are assigned.
+
+Captured stack addresses may be return addresses. They are not proven function
+entries, complete call graphs or recovered instructions. The Windows module
+table maps them to PES, but the PC executable fingerprint is still required
+before inspecting those locations in the Mac copy. No original code was executed,
+modified, unpacked or ported. The current on-disk code limitation remains.
+
+Next compare the two PC hashes, establish the analysis provider, then inspect
+the instructions around these addresses and their evidenced callers. No new
+game capture is needed for the stack investigation.
 
 ### How REA and Ghidra fit this evidence
 

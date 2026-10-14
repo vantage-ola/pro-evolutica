@@ -229,15 +229,18 @@ explicit read offsets/lengths and a process exit status of 0. One ball-archive
 read matches the offset and padded length of the viewer's reference entry 17;
 PC archive/executable hashes are still needed to confirm that mapping.
 CSV/PML inputs were moved unchanged from the root into ignored `private/`.
-CSV counts and the reference AFS table were cross-checked; PML caller stacks
-have not been decoded here. See [the Windows findings](research/pes2013-engine.md#verified-windows-capture).
+CSV counts and the reference AFS table were cross-checked. A bounded local PML
+inspection now matches all CSV timestamps and read ranges and extracts the
+selected ball read's PES stack address `0x004f7a0e`. It appears across 5,063 archive
+read events, suggesting a common file-reading boundary. Additional PES addresses
+are captured in archive-open stacks; their functions remain unidentified. See
+[the stack evidence](research/pes2013-engine.md#captured-file-io-stack-addresses).
 No engine function or Windows frame-time measurement is claimed.
 
 ## Next three tasks
 
-1. Obtain PC executable and ball-archive SHA-256 values, then inspect the
-   operation stack for the selected `dt0b.img` read in the preserved PML.
-   No broader capture is needed yet.
+1. Obtain PC executable and ball-archive SHA-256 values before applying the
+   recovered stack addresses to the inspected copy. No new capture is needed.
 2. Establish a readable code view and verified analysis provider to inspect one
    original file-loading caller. REA/Ghidra setup remains unverified;
    installation requires approval.

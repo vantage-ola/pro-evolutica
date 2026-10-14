@@ -17,8 +17,11 @@ confirms menu/match loading and normal exit. Exact archive read offsets and
 original caller functions remain unknown. The supplied Windows reference trace
 now adds read offsets/lengths and an exit status of 0; the user confirms a full
 match. A ball read matches our reference entry 17's offset and padded length.
-Next confirm the PC executable/archive hashes and inspect that read's stack.
-See [the Windows findings](research/pes2013-engine.md#verified-windows-capture).
+The PML now supplies the selected read's PES stack address `0x004f7a0e`, also
+present in most archive-read events, and additional archive-open addresses.
+Next confirm the PC executable/archive hashes and inspect the corresponding
+original instructions with a verified analysis provider.
+See [the stack evidence](research/pes2013-engine.md#captured-file-io-stack-addresses).
 Runtime observations establish platform boundaries and loading order, but do
 not recover function instructions by themselves. Android verification follows
 an implemented component; runtime research can proceed independently.
