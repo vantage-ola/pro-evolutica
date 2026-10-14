@@ -40,6 +40,7 @@ REA skill as informational checks. Only the requested Ghidra/Codex setup was add
 Full commands, logs and evidence stay ignored in
 `private/research/engine/tool-verification/`.
 
-Restart Codex to load the registration into the chat. Direct CLI and MCP analysis
-are verified; this chat has not yet loaded the new tools. No PES engine function
-was analysed or ported during installation. Its on-disk code limitation remains.
+REA is now available in the chat. Direct CLI and MCP analysis are verified.
+No PES engine function was analysed or ported during installation. The subsequent
+[captured-frame check](../research/pes2013-engine.md#ghidra-check-of-the-captured-frames)
+records the first game investigation through this connection.

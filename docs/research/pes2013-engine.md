@@ -350,9 +350,45 @@ table maps them to PES, and the matching PC executable fingerprint permits
 inspecting those locations in the Mac copy. No original code was executed,
 modified, unpacked or ported. The current on-disk code limitation remains.
 
-Next inspect
-the instructions around these addresses and their evidenced callers. No new
-game capture is needed for the stack investigation.
+Ghidra's check of these addresses is recorded below. The saved trace is sufficient
+to identify the locations; observing the running game is the next step toward
+their actual file-loading behaviour.
+
+### Ghidra check of the captured frames
+
+REA is now available in the chat. Ghidra 12.1.4 opens the unchanged PE32/x86
+input with the expected SHA-256 and completes its default auto-analysis.
+`resolve_containing_procedure` returns `found: false`, reason
+`not_in_procedure`, at all four captured addresses:
+
+- `0x004f7a0e`: `.text`, file offset `0x000f6e0e`.
+- `0x004f779e`: `.text`, file offset `0x000f6b9e`.
+- `0x004dc625`: `.text`, file offset `0x000dba25`.
+- `0x00504b7f`: `.text`, file offset `0x00103f7f`.
+
+For each address, `read_bytes` returns the complete 64-byte window starting
+32 bytes before the frame. All four windows exactly match an independent
+DOS/PE section-table mapping and direct source-file read. Each Evidence record
+has the expected executable digest and provider version. The executable's
+SHA-256 is unchanged afterward. The temporary Ghidra session closes successfully.
+Full Evidence and checked mappings remain ignored under
+`private/research/engine/ghidra-file-io-01/`.
+
+This confirms the imported bytes at these locations, but does not recover
+function boundaries, callers, instruction flow or pseudocode. A negative
+procedure query does not prove that a function cannot exist there at runtime;
+the transformed-code interpretation remains a hypothesis. No addresses were
+forced into functions and no decoder, unpacker or header patch was applied.
+
+CrossOver's existing 32-bit WineDbg starts in the `PES 2013` bottle and its
+`--command 'info proc'` query lists Windows processes. PES was not running during
+that check. The next investigation is a brief observation of the file-read API
+boundary while the user runs the game normally: establish the current process,
+module base and caller, then record relevant arguments and outcomes. Runtime
+calls and instructions must be observed before naming or implementing a routine.
+WineDbg's [upstream manual](https://github.com/wine-mirror/wine/blob/master/programs/winedbg/winedbg.man.in)
+documents process enumeration, attachment, backtraces and detachment; these
+capabilities have not yet been tested against PES in this session.
 
 ### How REA and Ghidra fit this evidence
 
@@ -368,9 +404,10 @@ For the candidate ball read, the objective is to connect an original caller
 address to its file/AFS loading logic, verify the inferred inputs and outputs,
 then compare a small portable equivalent with original behaviour. A caller stack
 can give an address to inspect; it does not by itself recover the function.
-Installation and provider/client health checks now pass. The saved MCP launcher
-decompiles a known synthetic PE function correctly. Restart Codex to expose the
-new tools in this chat; direct CLI and MCP analysis already work.
+Installation and provider/client health checks now pass, and REA is available in
+the chat. The saved MCP launcher decompiles a known synthetic PE function correctly.
+The captured PES frame queries above now verify the static-code limitation at
+those locations; no original file-loading function has been recovered.
 The current on-disk code limitation still applies: logging and an MCP connection
 do not make transformed bytes readable or automatically port the game.
 

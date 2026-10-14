@@ -202,7 +202,7 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
 - Ghidra 12.1.4 and REA 6.4.0 are installed locally with a compiled ARM64
   decompiler. Ghidra provider and Codex registration health checks pass.
   A known synthetic x86 PE function decompiles correctly through the CLI and
-  saved MCP launcher. Restart Codex to load the new tools into this chat.
+  saved MCP launcher. REA tools are now available in this chat.
   See [the installation verification](verification/engine-tooling.md).
 - ADB sees an authorised `SM_N981U` running Android 13/API 33. The native app
   reports Adreno 650/OpenGL ES 3.2 and a PS4 controller. Triangle and cube evidence
@@ -239,12 +239,19 @@ selected ball read's PES stack address `0x004f7a0e`. It appears across 5,063 arc
 read events, suggesting a common file-reading boundary. Additional PES addresses
 are captured in archive-open stacks; their functions remain unidentified. See
 [the stack evidence](research/pes2013-engine.md#captured-file-io-stack-addresses).
+Ghidra default analysis now finds no containing procedure at any of the four
+captured PES addresses. Four 64-byte provider windows match independently mapped
+source bytes exactly, and the source digest remains unchanged. The temporary
+analysis session is closed. CrossOver's existing 32-bit WineDbg starts and lists
+processes; attachment to PES and runtime file-call observation remain pending.
+See [the Ghidra check](research/pes2013-engine.md#ghidra-check-of-the-captured-frames).
 No engine function or Windows frame-time measurement is claimed.
 
 ## Next three tasks
 
-1. Reload Codex to expose the verified REA/Ghidra connection in the chat.
-2. Inspect the captured original file-loading addresses with Ghidra and determine
-   whether meaningful instructions can be recovered from the current on-disk copy.
+1. Observe a file-read boundary during a normal CrossOver game run, recording
+   the actual process/module base, caller, relevant arguments and outcome.
+2. Establish an evidenced original routine and its inputs/outputs from those
+   observations; Ghidra has not recovered it from the current on-disk copy.
 3. Specify and compare one small original function/subsystem before any native
    replacement, then use that evidence to choose the next porting step.
