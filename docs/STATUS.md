@@ -259,13 +259,15 @@ the user confirms normal response and exit, and PES is no longer running.
 See [the Ghidra check](research/pes2013-engine.md#ghidra-check-of-the-captured-frames).
 See [the runtime observation](research/pes2013-engine.md#runtime-file-read-observation).
 See [the archive call chain](research/pes2013-engine.md#runtime-archive-open-seek-and-read).
+The bounded WineDbg capture follows the successful `0x800`-byte read path:
+it advances the reader cursor and returns `1` through an indirect callback.
+Only the success path was observed; the failure branch and full routine entry
+remain unresolved. See [the successful read return](research/pes2013-engine.md#observed-read-routine-return).
 No engine function or Windows frame-time measurement is claimed.
 
-## Next three tasks
+## Next tasks
 
-1. Bound the original routine around the observed `ReadFile` call and trace its
-   return/error behaviour and interface; the full routine remains unresolved.
-2. Follow archive entry selection into an actual payload read, recording its
+1. Follow archive entry selection into an actual payload read, recording its
    index, offset, size and original caller.
-3. Specify and compare one small original function/subsystem before any native
+2. Specify and compare one small original function/subsystem before any native
    replacement, then use that evidence to choose the next porting step.

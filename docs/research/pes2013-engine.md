@@ -469,15 +469,38 @@ the captured addresses to actual API behaviour; containing function boundaries
 and full instruction flow remain unresolved. The automatic backtrace omits the
 direct seek/read caller, so the raw stack return addresses supply that evidence.
 
-All breakpoints/watchpoints were absent before detachment. PES remained running,
-and the user confirms it responded normally and then exited through its menu.
-Process enumeration confirms PES is absent afterward. Diagnostics and checked
-findings stay ignored in `private/research/engine/crossover-archive-01/`.
-Debugger pauses make this unsuitable for performance measurement. No native
-replacement or process-image dump was produced.
+All breakpoints/watchpoints were absent before detachment. PES remained
+responsive afterward, as the user confirmed. Diagnostics and checked findings
+stay ignored in `private/research/engine/crossover-archive-01/` and
+`private/research/engine/crossover-routine-01/`. Debugger pauses make this
+unsuitable for performance measurement. No native replacement or process-image
+dump was produced.
 
-Next bound the original file-reading routine around the observed call and trace
-its return/error behaviour, then follow archive entry selection into payload reads.
+#### Observed read routine return
+
+A third launch under the 64-bit Wine debugger stopped at the same `ReadFile`
+return address, `0x004f7a0e`, for handle `0x264`. This is the already-correlated
+`dt06.img` handle. The call requested `0x800` bytes; the API returned success
+and the output count was also `0x800`.
+
+The live instructions after the call test the Boolean result. On this successful
+path they skip the failure branch, compare the requested count with the
+returned count, advance the buffer and cursor by `0x800`, update state in the
+record addressed by `ESI`, and leave the loop because its observed count was
+one. The routine returns `1` to `0x00505e3f`, the return address of an indirect
+callback in the surrounding caller. This supports a bounded description of
+the successful read path and its interface; it does not recover the routine's
+entry point or establish the meaning of every record field.
+
+The failure branch calls through import slot `0x013f82a4`, compares the result
+with `0x26`, and branches on mismatch. That branch was not executed, so the
+failure result and error handling remain unverified. The reader's complete
+routine boundary also remains unresolved. Captured live instructions and
+register/output values are in the ignored private finding; only this concise
+summary is public.
+
+Next follow archive entry selection into an actual payload read, recording its
+index, offset, size and original caller.
 
 ### How REA and Ghidra fit this evidence
 
