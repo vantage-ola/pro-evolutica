@@ -94,11 +94,10 @@ A decompiler alone will not establish meaningful instructions in transformed cod
 
 ## Next evidence required
 
-The supplied installation copy is identical, so the next step is to establish
-what file/API logging the installed Winlator build supports. Its version remains
-unconfirmed: ADB found `com.winlator` for the primary user, but the device
-disconnected before version metadata could be read. No game trace was captured
-and no container settings were changed.
+The supplied installation copy is identical. The user has chosen the Mac for
+runtime investigation and reports that PES launches after installation inside
+CrossOver. The next evidence is a short file/DLL log from that installation;
+the prepared Winlator procedure below remains an alternative.
 
 Capture a short, clearly labelled run from launch to the menu, then one match
 load, using supported logging if available. Keep logs private and distinguish
@@ -106,6 +105,42 @@ observed filenames/API arguments from inferred engine roles. Logging can
 identify platform boundaries and loading order; it cannot supply original
 function instructions or justify a gameplay rewrite. State the chosen logging
 method, limits and effect on performance before capturing it.
+
+### CrossOver launch and capture
+
+Local application metadata identifies CrossOver **26.2**, build
+`26.2.0.39821`, with a bottle named `PES 2013`. The executable installed inside
+that bottle is 19,916,288 bytes with the same SHA-256 as the inspected copies.
+An independent `shasum` agrees, and the complete reconnaissance reports compare
+equal. Installation has not provided a different static code view.
+
+The user reports **launch succeeds**. Menu, match loading, gameplay, graphics
+settings, dependencies and performance have not yet been recorded. This is a
+manual launch result, not an agent-observed gameplay test.
+
+For the first capture:
+
+1. Close PES. Select its launcher inside the `PES 2013` bottle and choose
+   **Run with Options**.
+2. Enable **Create log file**. Enter `+file,+loaddll` in **Wine logging channels**.
+3. Choose a new `.cxlog` output under ignored
+   `private/research/engine/crossover-capture-01/`. That directory is prepared.
+4. Launch to the menu, load one match, and close PES after kickoff. Record which
+   steps succeeded and any error. Close the Run with Options dialog as well.
+5. Preserve the completed log before another capture. Launch normally afterward
+   to avoid keeping this diagnostic logging enabled.
+
+This workflow is documented in
+[CodeWeavers' debug-log guide](https://support.codeweavers.com/2-creating-a-debug-log).
+Use a new directory for each run. Logging can affect timing and generate large
+output; this short diagnostic is not a performance measurement. First inspect
+the actual log format and confirm PES file activity before implementing a
+parser or drawing loading conclusions. No runtime capture has passed yet.
+
+Mac logs can establish observed archive access and compatibility calls. They
+cannot establish Android rendering/performance or supply missing engine
+instructions. Device verification follows an implemented component; it is not
+required to collect this Mac research log.
 
 ### Prepare a short Wine log
 

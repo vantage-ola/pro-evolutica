@@ -206,16 +206,24 @@ The scope, mapping evidence and hashes are in [research/pes2013.md](research/pes
   is recorded in [verification/android.md](verification/android.md). The exact
   Winlator configuration remains pending.
 
+## Mac runtime investigation
+
+The user reports that PES 2013 launches after installation inside CrossOver.
+Local metadata identifies CrossOver 26.2, build `26.2.0.39821`, and a `PES 2013`
+bottle. Its installed executable has the same size, SHA-256 and reconnaissance
+report as the previously inspected copies; independent `shasum` agrees.
+Menu/match loading and runtime file/DLL logs remain pending. A private capture
+directory and [CrossOver instructions](research/pes2013-engine.md#crossover-launch-and-capture)
+are prepared. No Mac gameplay/performance result or engine function is claimed.
+
 ## Next three tasks
 
-1. Confirm the installed Winlator version and supported file/API logging. The
-   supplied installation copy has the same executable bytes; static tracing
-   remains limited. The [short capture procedure](research/pes2013-engine.md#prepare-a-short-wine-log)
-   is prepared from upstream source; the installed build and captured output
-   remain unverified. Preserve the working installation.
-2. Capture a short launch/menu and match-loading trace with a stated method.
-   Record observed files/API arguments separately from hypotheses. A readable
-   code view and verified analysis tool are still needed to recover functions;
+1. Capture a short CrossOver launch/menu and match-loading run with file/DLL
+   logging. The user reports launch succeeds; full loading and log coverage
+   still need evidence. Preserve the working installations.
+2. Inspect the captured format and PES file/API records before building a parser.
+   Record observed files/arguments separately from hypotheses. A readable code
+   view and verified analysis tool are still needed to recover functions;
    Ghidra installation requires approval.
 3. Specify and compare one small original function/subsystem before any native
    replacement, then use that evidence to choose the next porting step.
