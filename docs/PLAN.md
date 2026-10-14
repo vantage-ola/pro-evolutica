@@ -23,8 +23,11 @@ The supplied PowerShell hash photo confirms the PC executable/archive match the
 inspected Mac inputs. Ghidra/REA installation and synthetic PE decompilation now
 pass verification, and REA is available in the chat. Ghidra default analysis
 finds no containing procedure at any captured frame; the imported byte windows
-match the unchanged source file. Next observe a file-read boundary in a normal
-CrossOver run to establish its actual caller and behaviour.
+match the unchanged source file. A debugger launch now observes a successful
+startup read correlated with `settings.dat`, including the original call site,
+arguments and result. Its runtime instruction bytes differ from the file.
+Next connect an archive read to its filename/handle, range and original caller;
+the containing routine is still unresolved.
 See [the stack evidence](research/pes2013-engine.md#captured-file-io-stack-addresses).
 Runtime observations establish platform boundaries and loading order, but do
 not recover function instructions by themselves. Android verification follows

@@ -380,15 +380,55 @@ procedure query does not prove that a function cannot exist there at runtime;
 the transformed-code interpretation remains a hypothesis. No addresses were
 forced into functions and no decoder, unpacker or header patch was applied.
 
-CrossOver's existing 32-bit WineDbg starts in the `PES 2013` bottle and its
-`--command 'info proc'` query lists Windows processes. PES was not running during
-that check. The next investigation is a brief observation of the file-read API
-boundary while the user runs the game normally: establish the current process,
-module base and caller, then record relevant arguments and outcomes. Runtime
-calls and instructions must be observed before naming or implementing a routine.
+CrossOver's existing WineDbg starts in the `PES 2013` bottle and its
+`--command 'info proc'` query lists Windows processes. The first runtime
+observation is recorded below.
 WineDbg's [upstream manual](https://github.com/wine-mirror/wine/blob/master/programs/winedbg/winedbg.man.in)
-documents process enumeration, attachment, backtraces and detachment; these
-capabilities have not yet been tested against PES in this session.
+documents process enumeration, attachment, backtraces and detachment.
+
+### Runtime file-read observation
+
+Launch the game under `C:\windows\system32\winedbg.exe` for this CrossOver
+setup. Starting the 32-bit debugger attached to PES caused a restart into a
+64-bit debugger and a second attachment failure. Direct late attachment with
+the 64-bit debugger then produced a WOW64 fault in the interrupt thread and
+PES exited. A 64-bit command-process probe alone did not cover this failure.
+Launching a temporary 32-bit Wine command under the debugger worked; an
+import-address breakpoint captured its read of a 21-byte text fixture, the
+successful return and matching bytes. Breakpoints were removed and it detached.
+The [upstream implementation](https://github.com/wine-mirror/wine/blob/master/programs/winedbg/winedbg.c)
+also shows the 32-bit debugger restart after initial attachment. Do not assume
+late attachment works because enumeration or a 64-bit probe succeeds.
+
+PES was then launched under the 64-bit debugger from its installation directory.
+It reached its normal PE entry point, and one startup read was observed:
+
+- Wine process `0x00e4`; PES module `0x00400000`–`0x01c8d000`.
+- `ReadFile` import slot `0x013f8174` resolved to `0x7bebe7cc` in `kernel32`.
+- The stack return address was `0x004e7b41`. The six bytes immediately before it
+  encode a call through that import slot. This is an observed call site, not a
+  recovered containing function or the earlier archive-read frame.
+- Arguments: handle `0x00e4`, requested length 4,096 bytes, a writable buffer and
+  byte-count pointer, and a null overlapped pointer. The handle and PID having
+  the same numeric value does not identify the file.
+- At the return address, `EAX = 1` and the byte count was 852. The returned
+  16-byte prefix begins with `WECF` and matches the local 852-byte `settings.dat`.
+  The independent Windows capture also records a successful 852-byte read of
+  `settings.dat`. File identity is a correlation; the live handle name was not
+  queried. No archive read or full-match capture is claimed here.
+
+The observed six-byte call instruction differs from the independently mapped
+on-disk bytes at file offset `0x000e6f3b`. This establishes a runtime/on-disk
+difference at this site, without identifying its cause or recovering a routine.
+The executable hash remains unchanged. Both remaining breakpoints were removed,
+the debugger detached and exited successfully, and PES remained listed as
+running. The user confirms the game responds normally afterward.
+
+Commands, diagnostics, the fixture probe and checked findings stay ignored in
+`private/research/engine/crossover-debugger-01/`. No process image was dumped,
+no protection was bypassed, and no native replacement was implemented.
+Next observe an archive read with its filename/handle and range, then establish
+the original caller's boundaries and behaviour before specifying a port.
 
 ### How REA and Ghidra fit this evidence
 

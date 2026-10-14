@@ -242,15 +242,22 @@ are captured in archive-open stacks; their functions remain unidentified. See
 Ghidra default analysis now finds no containing procedure at any of the four
 captured PES addresses. Four 64-byte provider windows match independently mapped
 source bytes exactly, and the source digest remains unchanged. The temporary
-analysis session is closed. CrossOver's existing 32-bit WineDbg starts and lists
-processes; attachment to PES and runtime file-call observation remain pending.
+analysis session is closed. A subsequent launch under CrossOver's 64-bit
+WineDbg captures one successful startup `ReadFile` call: requested 4,096 bytes,
+returned 852, with a prefix matching local `settings.dat`. The call site at
+`0x004e7b3b` uses the expected import and differs from its on-disk bytes.
+File identity is correlated, not established by a live handle-name query.
+Late attachment faults in this setup; launching under the debugger works.
+Breakpoints were removed, the debugger detached, PES remains running and the
+user confirms it responds normally.
 See [the Ghidra check](research/pes2013-engine.md#ghidra-check-of-the-captured-frames).
+See [the runtime observation](research/pes2013-engine.md#runtime-file-read-observation).
 No engine function or Windows frame-time measurement is claimed.
 
 ## Next three tasks
 
-1. Observe a file-read boundary during a normal CrossOver game run, recording
-   the actual process/module base, caller, relevant arguments and outcome.
+1. Observe an archive read under the verified debugger launch, connecting its
+   filename/handle and range with the original caller and result.
 2. Establish an evidenced original routine and its inputs/outputs from those
    observations; Ghidra has not recovered it from the current on-disk copy.
 3. Specify and compare one small original function/subsystem before any native

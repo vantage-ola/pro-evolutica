@@ -44,3 +44,9 @@ REA is now available in the chat. Direct CLI and MCP analysis are verified.
 No PES engine function was analysed or ported during installation. The subsequent
 [captured-frame check](../research/pes2013-engine.md#ghidra-check-of-the-captured-frames)
 records the first game investigation through this connection.
+
+The subsequent [runtime check](../research/pes2013-engine.md#runtime-file-read-observation)
+verifies a 32-bit fixture read and one original PES startup read using CrossOver's
+64-bit WineDbg to launch the target. Late attachment faulted in this setup.
+The successful PES session removed its breakpoints and detached; the user
+confirms the game responds normally afterward.
