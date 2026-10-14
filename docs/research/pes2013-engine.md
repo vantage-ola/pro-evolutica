@@ -94,10 +94,10 @@ A decompiler alone will not establish meaningful instructions in transformed cod
 
 ## Next evidence required
 
-The supplied installation copy is identical. A CrossOver file/DLL capture now
-passes the checks below. The next capture is a Windows 11 reference run supplied
-by the user, seeking archive read offsets and operation stacks. The prepared
-Winlator procedure remains an alternative.
+The supplied installation copy is identical. CrossOver and Windows file-activity
+captures now pass the checks below. The Windows trace supplies archive read
+offsets. Next verify its executable/archive fingerprints and inspect one read's
+caller stack. The prepared Winlator procedure remains an alternative.
 
 Capture a short, clearly labelled run from launch to the menu, then one match
 load, using supported logging if available. Keep logs private and distinguish
@@ -233,7 +233,97 @@ Compare the PC executable hash before reusing Mac addresses. Inspect observed
 read offsets/lengths and available stacks for one archive path first. File/API
 logs cannot provide all simulation, AI or rendering behaviour; subsequent
 captures should answer a specific unresolved question. The Windows procedure
-is prepared, not yet tested on the user's PC.
+has produced the supplied CSV/PML capture below; the exact recorder configuration
+was not observed by the agent.
+
+### Verified Windows capture
+
+The supplied UTF-8 CSV contains **28,253 data records**, all from `pes2013.exe`,
+PID `15116`. The user confirms menu, kickoff, a full match and exit from the
+game's menu. Replay coverage was not separately confirmed. The recorded process
+exit status is `0`. Clock times cross midnight once, spanning 1,197.4894039
+seconds; no capture date, frame timings or per-stage markers are supplied.
+This is a loading reference, not a performance benchmark.
+
+Both root-directory inputs were fingerprinted and moved unchanged into ignored
+`private/research/engine/windows-capture-01/`:
+
+- `pes13.CSV`: 5,310,758 bytes, SHA-256
+  `2ba4cf0868de83fdbb9af9bf9d8a81fc162044c04438b9ea687690345396ae0d`.
+- `pes13.PML`: 33,142,746 bytes, SHA-256
+  `d4285b6da29b46597b679af7645a6c717f1e800d66b81704560dd775f4d92f86`.
+
+The CSV columns are time, process, PID, operation, path, result and detail.
+There are 80 successful archive-open events across **19 archives**, and 5,068
+successful archive `ReadFile` events out of 5,328 `ReadFile` events overall.
+The 16 archive basenames from the Mac run also open here; additional successful
+opens include `dt00_e.img`, `dt05_e.img` and `dt05_r.img`. Missing alternate
+language files are also probed. Such `NAME NOT FOUND` results are observations,
+not evidence that the game failed: the run reached a full match and exited normally.
+Windows and Wine event counts cover different recording layers and sessions;
+their totals must not be treated as a performance comparison.
+
+There are 126 image-load events, including `d3d9.dll`, `d3dx9_30.dll`,
+`dsound.dll`, `dinput8.dll` and `XInput9_1_0.dll`, alongside ATI driver modules.
+Repeated loads are not necessarily distinct modules. The main image loads at
+`0x00400000`, with size `0x0188d000`. That agrees with the inspected executable's
+image metadata but does not replace a SHA-256 comparison of the PC executable.
+
+#### A ball-archive read to investigate
+
+Event numbers here are one-based CSV data records, excluding the header.
+`dt0b.img` has five successful read events:
+
+- Events 21,459 and 21,463 read 2,048 bytes at offset 0.
+- Event 22,257 reads 2,048 bytes at offset 2,048.
+- Event **26,041**, at `00:00:19.2899644`, reads **81,920 bytes at offset
+  5,992,448**. Event 26,042 repeats that range with `Non-cached, Paging I/O`
+  flags. The duplicate range and paging flag do not establish two distinct
+  asset requests.
+
+The file's recorded end is 11,028,480 bytes, matching our inspected ball archive.
+In that reference archive, entry 17 begins at 5,992,448 and contains 81,872 bytes;
+entry 18 begins 81,920 bytes later. A separate direct AFS header/table read
+confirms those values. This is the entry used for the native ball viewer.
+The offset and length therefore support an entry-17 loading candidate in the
+original Windows game. PC archive equality and the displayed ball choice remain
+unproven until its archive hash and visual context are checked. The trace does
+not show returned file contents or model-decoding instructions.
+
+The selected read occurs about 105.320 seconds after process start, but no stage
+marker labels it as kickoff. `dt10.img` has only two observed reads, both 2,048
+bytes at offset 0; this alone cannot establish script execution or non-use.
+
+The CSV has no thread IDs or caller stacks. PML was preserved, size/hash checked
+and its `PML_` signature checked, but its events/stacks have not been decoded on
+this Mac. Next inspect the stack for the `dt0b.img` read at
+`00:00:19.2899644` in Process Monitor. Record available module addresses/offsets;
+symbols may remain unresolved. Obtain the PC `pes2013.exe` and `dt0b.img`
+SHA-256 values before assigning existing code addresses or entry identity.
+
+Bounded snapshots and before/after metadata checks protect the inspection from
+input changes. Dictionary-based CSV totals agree with a separate positional-row
+count. Analysis code and detailed records stay private; no parser dependency or
+new production tool was added.
+
+### How REA and Ghidra fit this evidence
+
+The logs identify a concrete operation to investigate. Ghidra examines the
+executable's machine instructions and produces an approximate C-like view.
+REA exposes an MCP connection through which the agent can request Ghidra's
+functions, strings, references, instructions and callers. In this arrangement,
+REA is the bridge and Ghidra is the analysis provider; a second Ghidra MCP server
+is not required. See [REA setup](https://rea.tools/get-started/) and
+[its native-analysis workflow](https://rea.tools/guides/native/).
+
+For the candidate ball read, the objective is to connect an original caller
+address to its file/AFS loading logic, verify the inferred inputs and outputs,
+then compare a small portable equivalent with original behaviour. A caller stack
+can give an address to inspect; it does not by itself recover the function.
+No REA/Ghidra MCP tools are exposed in this session, and the earlier provider
+checks remain unverified. Installation/configuration has not been performed.
+The current on-disk code limitation still applies: logging and an MCP connection
+do not make transformed bytes readable or automatically port the game.
 
 ### Prepare a short Wine log
 

@@ -221,14 +221,25 @@ reported menu/match run. File offsets and original caller functions are absent.
 See [the capture findings](research/pes2013-engine.md#verified-crossover-capture).
 No Mac performance measurement or original engine function is claimed.
 
+## Windows runtime investigation
+
+The user confirms menu, kickoff, a full match and exit from the game's menu.
+The supplied CSV has 28,253 PES-only events, 19 successfully opened archives,
+explicit read offsets/lengths and a process exit status of 0. One ball-archive
+read matches the offset and padded length of the viewer's reference entry 17;
+PC archive/executable hashes are still needed to confirm that mapping.
+CSV/PML inputs were moved unchanged from the root into ignored `private/`.
+CSV counts and the reference AFS table were cross-checked; PML caller stacks
+have not been decoded here. See [the Windows findings](research/pes2013-engine.md#verified-windows-capture).
+No engine function or Windows frame-time measurement is claimed.
+
 ## Next three tasks
 
-1. Obtain a short Windows 11 reference capture and executable fingerprint from
-   the user's gaming PC. The PC can stay offline; transfer tools and results by
-   USB using [the procedure](research/pes2013-engine.md#windows-reference-capture-including-an-offline-pc).
-2. Inspect file offsets/lengths and available operation stacks for one archive
-   path. Compare fingerprints before reusing addresses. A readable code view
-   and verified analysis tool are still needed to recover functions;
-   Ghidra installation requires approval.
+1. Obtain PC executable and ball-archive SHA-256 values, then inspect the
+   operation stack for the selected `dt0b.img` read in the preserved PML.
+   No broader capture is needed yet.
+2. Establish a readable code view and verified analysis provider to inspect one
+   original file-loading caller. REA/Ghidra setup remains unverified;
+   installation requires approval.
 3. Specify and compare one small original function/subsystem before any native
    replacement, then use that evidence to choose the next porting step.
