@@ -267,8 +267,9 @@ No engine function or Windows frame-time measurement is claimed.
 
 ## Next tasks
 
-1. Capture the naturally occurring 81,920-byte read in WineDbg, correlate its
-   handle with `dt0b.img`, and inspect the successful return path.
-2. Trace the matching WESYS entry through the original decoder/model loader.
-   Recover one bounded function's inputs, outputs and control flow before
-   deciding whether a native/hybrid component is justified.
+1. Use the saved Windows PML/CSV and matching file hashes to trace the
+   `0x004f7a0e` payload-read site in Ghidra toward the WESYS decoder/model loader.
+2. If static evidence cannot expose the needed live instructions or register
+   values, capture only that bounded code window on native Windows. Reserve
+   CrossOver for Wine-specific comparison; use Winlator for Android play and
+   performance work.

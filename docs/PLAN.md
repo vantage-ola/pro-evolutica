@@ -26,13 +26,17 @@ copies. Ghidra and REA are available, but default analysis finds no containing
 procedure at the captured PES addresses, and runtime call-site bytes differ
 from the on-disk copy. See [the executable and runtime evidence](research/pes2013-engine.md).
 
-Next capture the naturally occurring 81,920-byte read under WineDbg, correlate
-its handle with `dt0b.img`, and inspect its return through the shared read
-boundary. Then trace how that WESYS entry reaches the decoder/model loader and
-identify one original function with enough boundary and behavior evidence to
-compare against our existing parser. Use that comparison to choose between
-improving compatibility and building a small native/hybrid component; do not
-treat the viewer as a PES engine port.
+Use the existing Windows PML as the primary evidence for original-game file
+access: it already records the successful 81,920-byte `dt0b.img` read, its
+offset and length, and the PES stack address. The matching executable and
+archive hashes connect that trace to the inspected files. Continue from this
+address in Ghidra and relate it to the known WESYS entry and decoder. If the
+missing runtime instructions or register values become necessary, capture a
+bounded code window on native Windows; do not repeat the payload read under
+CrossOver just to reconfirm what the Windows trace already shows. Use CrossOver
+only to answer a Wine-specific comparison question. Winlator remains the place
+to measure and improve how the original game runs on Android. Do not treat the
+viewer as a PES engine port.
 See [the stack evidence](research/pes2013-engine.md#captured-file-io-stack-addresses).
 Runtime observations establish platform boundaries and loading order, but do
 not recover function instructions by themselves. Android verification follows
