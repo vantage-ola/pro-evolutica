@@ -2,7 +2,8 @@
 
 The next investigation follows the original executable. The asset viewer is a
 format/rendering diagnostic; it is not a replacement football simulation.
-No original engine function has been recovered or ported yet.
+Original file-I/O routines can now be inspected from the supplied Windows memory
+snapshots. No gameplay engine function has been recovered or ported yet.
 
 ## Input and method
 
@@ -511,15 +512,259 @@ Wine instructions differ at this location. They do not establish why, and the
 Windows PML contains no instruction bytes or registers to determine whether the
 native Windows process has the same live instruction.
 
-The next code-level observation should use a native Windows debugger for a
-small window around this call site, with the `ReadFile` arguments and return
-value. The saved Procmon trace remains the source for which file range the
-Windows game reads. Another CrossOver capture would only answer a Wine-specific
-question. Ghidra mapping evidence and this bounded comparison are preserved in
+This comparison motivated a native Windows capture of the call-site bytes and
+the `ReadFile` arguments and return value. The supplied snapshots below now
+provide the bytes; historical call arguments remain unavailable. The saved
+Procmon trace remains the source for which file range the Windows game reads.
+Ghidra mapping evidence and this bounded comparison are preserved in
 `private/research/engine/ghidra-callsite-01/`.
 
-Next capture the live call-site window and `ReadFile` arguments on native
-Windows; retain the Procmon log as the record of file path, offset and length.
+The Windows memory snapshots below now supply the live call-site bytes. A new
+debugger capture is deferred while these snapshots are analysed. The existing
+Procmon log remains the record of file path, offset and length.
+
+### Verified Windows memory snapshots
+
+The supplied bundle contains three full-memory minidumps, named `menu.dmp`,
+`kickoff-paused.dmp` and `replay-paused.dmp`, totalling 1,403,745,629 bytes. These
+state labels come from their filenames and the requested collection procedure;
+the agent did not observe the PC screens. The originals remain unchanged under
+ignored `private/research/engine/windows-capture-01/PES-CAPTURE/`.
+
+A local standard-library script checks the MINIDUMP header, stream-directory
+bounds, module records and captured memory ranges before mapping addresses to
+file offsets. The full-memory payload uses
+[MINIDUMP_MEMORY64_LIST](https://learn.microsoft.com/en-us/windows/win32/api/minidumpapiset/ns-minidumpapiset-minidump_memory64_list).
+Unused zero stream entries are ignored. The WOW64 module list repeats the same
+PES module record; identical records are deduplicated for identification. The
+AMD64 system-information field describes the host, while the captured PES header
+is PE32/x86, machine `0x014c`, at base `0x00400000`.
+
+- `menu.dmp`: 352,427,301 bytes; SHA-256
+  `b351826ebd8ab4aaf0f04b2c5aac9ee7db80276779ad6305b35cd8b78c4ab26c`.
+- `kickoff-paused.dmp`: 516,061,439 bytes; SHA-256
+  `a59752e510107e6ce2c1f04e4a850f016463de5fad437e058248b41fe75af520`.
+- `replay-paused.dmp`: 535,256,889 bytes; SHA-256
+  `8c679f0e27185e769fd1b457a36ea707596df1bbdcbc9fa05e30625b25cd9f7b`.
+
+Independent `shasum` agrees with all three fingerprints. A second address-mapping
+check using direct file seeks reproduces all nine extracted code windows: three
+windows per dump, 16 KiB per state. Corresponding windows are byte-identical
+across all three states. They contain the same `CreateFileA`, `SetFilePointer`
+and `ReadFile` call instructions previously observed under CrossOver.
+
+In particular, native Windows memory at `0x004f7a08` contains
+`ff 15 74 81 3f 01`, the call through `0x013f8174`. The captured slot points to
+`0x75bdedc0`, which an independent walk of the captured 32-bit `kernel32.dll`
+export table identifies as `ReadFile`, in all three dumps. This closes the
+missing native-Windows instruction comparison at the PML's common read frame.
+
+The in-memory PE header also differs from the on-disk header: it records six
+sections, entry RVA `0x1000` and `SizeOfImage = 0x0188c000`; the source has seven
+sections, entry RVA `0x0188c030` and `SizeOfImage = 0x0188d000`. The captured
+module-list size is still `0x0188d000`, and its timestamp matches the source.
+These observations do not establish the transformation mechanism or a full-file
+hash for the running image. The previously supplied PC executable hash remains
+the installation fingerprint. No runnable executable was reconstructed.
+
+#### Bounded file-I/O analysis from the captured bytes
+
+Ghidra 12.1.4 imports the small memory windows as raw x86/Windows code at their
+captured addresses. Disassembly from aligned entries following padding gives
+these function bodies, with approximate C-like output saved privately:
+
+- `0x004f7740`–`0x004f782a`: opens a path with `CreateFileA`, stores its handle,
+  queries file size through the helper below and updates a state record.
+- `0x004f7970`–`0x004f7a9d`: the read worker containing the observed call at
+  `0x004f7a08`. It limits each positive-size chunk to `0x20000` (128 KiB), rounds
+  it upward to a `0x800` (2,048-byte) boundary, seeks, calls `ReadFile`, examines
+  the result and returned count, and updates buffer/cursor/state fields.
+- `0x00505730`–`0x00505778`: a `GetFileSize`/`GetLastError` wrapper that writes
+  low/high size words through an output pointer.
+- `0x00505780`–`0x005057d4`: a `SetFilePointer`/`GetLastError` wrapper with an
+  optional low/high position output.
+
+Known Windows API argument counts and `__stdcall` conventions were supplied to
+Ghidra's import-pointer types; otherwise its stack reconstruction was misleading.
+The import names are checked against the unchanged source PE import table.
+Function names, local variables and record-field meanings are still analyst
+interpretations, not recovered symbols. The assembly is the primary evidence.
+
+For the earlier entry-17 candidate, rounding 81,872 bytes upward to a 2,048-byte
+boundary gives 81,920, consistent with the Procmon read length. This connection
+does not establish the worker's input record for that historical call. A paused
+memory snapshot does not reproduce its earlier register arguments, return value
+or complete execution history, and the static error branches have not been
+executed in a controlled check. The Windows x32dbg attempt is not claimed as a
+successful breakpoint capture; the user reports PES recovered immediately after
+detachment.
+
+Full disassembly, C-like output, hashes, local scripts and the Ghidra project
+remain under ignored `dump-analysis-01/` beside the supplied captures. The source
+executable's independent SHA-256 is unchanged. No gameplay code was ported and
+no additional Windows or phone collection is currently requested. The next
+analysis follows its dispatch and a header-decoding helper below.
+
+### Read-job dispatch and WESYS-compatible decoding
+
+The captured code establishes how the file-read worker is submitted and called:
+
+- `0x004f88c0` prepares a read request and submits the worker pointer
+  `0x004f7970` through `0x00506030` at call site `0x004f89cd`.
+- `0x00506030` locks the dispatcher and calls `0x00505ca0`. That function
+  stores the callback at record offset `0x30`, its argument at `0x34`, and marks
+  the request pending at offset `4`.
+- The worker loop at `0x00505df0` waits on an event, calls the stored callback
+  with its argument, then clears the pending flag. Its indirect call returns to
+  `0x00505e3f`, consistent with the earlier CrossOver observation.
+
+All three snapshots retain a dispatcher record at `0x016d81b0` containing that
+callback and argument `0x016d8720`. Its pending flag is zero. This supports the
+field interpretation; it does not identify an active job or associate this
+retained record with the earlier entry-17 read. Some internal functions pass
+arguments in registers, so their decompiler output is not a verified C calling
+interface.
+
+A separate helper at `0x01134d40` matches the known 16-byte WESYS header layout.
+It checks that byte `2` is `1`, reads the compressed length at offset `8` and
+decoded length at offset `12`, allocates an output buffer, and passes the payload
+at offset `16` to `0x01302ac0`. It returns the buffer on success or null on a
+decoder error. This function alone does not check the full WESYS signature or
+establish input bounds checks.
+
+The callee at `0x01302ac0` has the structure of zlib 1.2.3's
+[`uncompress()`](https://raw.githubusercontent.com/madler/zlib/v1.2.3/uncompr.c):
+it initializes a stream with version string `1.2.3`, invokes the inflate routine
+with finish mode `4`, updates the output length on success and cleans up the
+stream. This is a structural identification from captured instructions, not an
+execution check of the original decoder.
+
+Verification compares ten bounded memory windows, 148 KiB per snapshot, across
+all three dumps; all corresponding bytes match. Five key call/pointer
+instructions are checked against the disassembly. The saved ball entry has
+81,845 compressed bytes and a declared output of 748,000 bytes, consistent with
+the fields this helper reads. Our existing Python decoder reproduces the saved
+decoded file exactly, and its 33 focused tests pass. The unchanged compressed
+and decoded ball payloads were not found in the snapshots; a buffer may have
+been released or transformed, so this does not establish what was displayed.
+
+These first windows establish the reader and decoder separately. The next
+section follows their callers and shared buffer fields. Private scripts, checks
+and the Ghidra project for this first step are saved under
+`windows-capture-01/loader-trace-01/`. No original instructions were executed
+and no Android loader was added in this step.
+
+### Resource IDs, archive entries and the decode stage
+
+The higher-level loader now supplies a static route through archive selection,
+entry-stream reading and decompression. This combines decoded calls, captured
+function tables and buffer-field use; it is not a recording of the entire route
+executing during a match.
+
+**Archive selection.** `0x01135360` first checks an alternate-resource lookup at
+`0x01136d20`. On the base-archive path, the upper byte of a 32-bit resource ID
+selects a holder from `0x018d9c98`; the lower 24 bits select its entry. The holder's
+field at `0x0c` points to an archive object. `0x01251f90` searches attached
+providers before calling that object's index-lookup method. In the four checked
+archives this method is `0x004ac170`, which creates an entry stream through
+`0x00d3ade0` when the object's alternate dictionary is absent.
+
+Selectors `0x0b`, `0x0c`, `0x0d` and `0x0e` match the earlier registry records for
+balls, the two player archives and animations. Their captured archive paths,
+counts and complete entry-size arrays agree with the local files: 37 entries in
+`dt0b.img`, 6,874 in `dt0c.img`, 3,042 in `dt0d.img` and 236 in `dt0e.img`.
+The metadata consumed by `0x004f5de0` stores the initial displacement and entry
+lengths. Its accumulation of lengths rounded to 2,048-byte units reproduces
+**every entry offset** in those four AFS indexes, in all three snapshots. The
+function also contains a compact sector-length branch; the checked archives use
+the byte-length branch.
+
+**Reading.** `0x011354a0` obtains an entry stream, allocates or reuses a buffer,
+submits the read and waits for completion. The stream's size method rounds the
+actual entry length upward to 2,048 bytes. Its read method, `0x00d3a840`, opens
+the selected archive entry and converts byte ranges to sector units. The request
+passes through `0x01175410`, `0x004f5c70`, `0x004f5630` and `0x004f5560` into the
+file scheduler. The scheduler's context handler `0x00500410` calls
+`0x00503970`, which invokes device-table slot `0x20`. The WIN table at
+`0x01403640` places `0x004f9380` in that slot, connecting to the previously
+traced background worker and `ReadFile` call.
+
+**Decoding.** The read stage stores its buffer and length at loader offsets
+`0x48` and `0x4c`. The completion routine `0x011356c0` either transfers that
+buffer directly or passes it to the header-aware object at `0x01134ed0` and
+dispatcher `0x01135000`. Type byte `0` copies the stored payload; type `1` calls
+`0x01134f30`, then `0x01134df0` and the zlib-compatible decoder. Ownership fields
+control whether the input buffer is freed. These field meanings come from the
+instructions; exact C interfaces and all error paths remain unverified.
+
+The earlier caller candidate `0x00cc10fc` is also a real call to the smaller
+header helper. Its containing function, `0x00cc0f90`, walks named 12-byte bundle
+records and treats `.tex` entries separately. It supports whole-bundle and
+per-entry decoding on different branches. This does not establish that the ball
+uses this particular named-bundle consumer.
+
+**Working base-archive check.** Applying the inferred ID layout to ball entry 17
+gives candidate ID `0x0b000011`. A private check selects `dt0b.img`, reads offset
+5,992,448 and its actual 81,872 bytes, then uses our existing WESYS decoder. Both
+the input and all 748,000 decoded bytes match the previously saved sample.
+Its padded length is 81,920 bytes, matching the earlier Procmon range. The ID
+itself was derived, not observed as a historical call argument, and the
+alternate-resource route can take precedence.
+
+Verification compares 14 code windows, 184 KiB per snapshot, across all three
+states and checks the emitted instruction bytes against their captured source.
+Direct-call targets and both relevant function tables are checked separately.
+Mutable device records are kept separate: two WIN records remain in the menu
+snapshot, while neither later snapshot retains one in that device-record array.
+Their absence does not show that the route was unused earlier. No original
+instructions were executed. Evidence and the reproducible local check remain
+under ignored `windows-capture-01/loader-chain-01/`.
+
+### Base-archive loader prototype
+
+`tools/pes_resource.py` implements the checked base route in Python: split the
+32-bit ID, select one of `dt0b`–`dt0e`, read the exact AFS entry and decode its
+WESYS wrapper. It reuses the existing parsers. The AFS reader now exposes a
+bounded selected-entry API without scanning payloads or hashing the archive.
+The WESYS decoder also handles the observed stored `00 01 00` layout, requiring
+zero at offset 12. Alternate providers, loose files and the original scheduler
+are outside this prototype's scope.
+
+The public CLI reproduced two saved local samples byte-for-byte:
+
+- Derived ID `0x0b000011`: `dt0b.img` entry 17, 81,872 input bytes and 748,000
+  decoded bytes. Both hashes and all output bytes match the saved ball sample.
+- Derived ID `0x0e000001`: `dt0e.img` entry 1, 3,928,288 input bytes and 3,928,272
+  decoded bytes. The stored output matches the saved animation bundle and its
+  recorded SHA-256 `7b2bb68d7efc91adf7ebcd5d90833bf36a73b0a80afd4b5b24d5c72d20f22d8c`.
+
+Archive size and modification/change timestamps remained unchanged. Original
+synthetic fixtures check both wrapper types, archive selection, exact entry
+reads, malformed indices/payloads, allocation limits, concurrent mutation and
+CLI output protection. The focused AFS/WESYS/resource tests pass: 89 tests.
+The full Python suite passes: 434 tests. Commands:
+
+```bash
+.venv/bin/python -m pytest tests/test_afs_inspect.py tests/test_wesys_unpack.py tests/test_pes_resource.py -q
+.venv/bin/python -m pytest -q
+```
+
+The local comparison script, CLI reports and outputs remain under ignored
+`private/research/engine/portable-resource-01/`. Usage is in
+[TOOLS.md](../TOOLS.md#load-a-base-archive-resource-by-id). These are format and
+saved-output comparisons. No original routine was executed, neither derived ID
+was observed as a historical call argument. Equivalence to the original engine
+routine remains unverified.
+
+The corresponding C++ implementation in `native/assets/resource.h` and `.cpp`
+now reproduces both saved samples and the Python output byte-for-byte in normal
+and sanitizer builds. All eight native CTest targets pass. It builds into the
+ARM64 APK using the existing zlib dependency. The viewer's optional L-key
+diagnostic now reproduces both decoded buffers byte-for-byte on the Note20;
+entry metadata agrees, and missing/corrupt input checks pass. The buffers are
+saved for comparison rather than passed to the renderer. Original-routine
+equivalence remains unverified. See
+[the native verification record](../verification/native-resource.md).
 
 ### How REA and Ghidra fit this evidence
 
@@ -537,10 +782,10 @@ then compare a small portable equivalent with original behaviour. A caller stack
 can give an address to inspect; it does not by itself recover the function.
 Installation and provider/client health checks now pass, and REA is available in
 the chat. The saved MCP launcher decompiles a known synthetic PE function correctly.
-The captured PES frame queries above now verify the static-code limitation at
-those locations; no original file-loading function has been recovered.
-The current on-disk code limitation still applies: logging and an MCP connection
-do not make transformed bytes readable or automatically port the game.
+The captured PES frame queries above verify the on-disk code limitation at those
+locations. The later memory snapshots make the live file-I/O and header-decoding
+routines inspectable. Logging and an MCP connection alone do not make transformed
+bytes readable or automatically port the game.
 
 ### Prepare a short Wine log
 
@@ -594,8 +839,8 @@ device; the user has been given the capture steps. No logging setting or game
 file has been changed by the agent.
 
 If another executable becomes available, fingerprint it independently before
-assuming readable code or matching addresses. Once a readable code view and
-working analysis tool exist, trace an archive-record consumer or file-I/O caller
-and follow its callers. Select one small function only after its instructions,
+assuming readable code or matching addresses. The supplied Windows snapshots
+now provide a readable file-I/O code view. Trace its registration and callers
+toward an archive-record consumer. Select one small function only after its instructions,
 inputs and outputs are evidenced. Compare a portable equivalent with original
 behaviour before calling it a port. Preserve the working Winlator installation.

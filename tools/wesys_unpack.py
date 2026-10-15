@@ -1,4 +1,4 @@
-"""Decode the observed 00 01 01 WESYS/zlib wrapper; never execute its payload."""
+"""Decode observed stored and zlib WESYS wrappers; never execute their payloads."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ MAX_INPUT_SIZE = 64 * 1024**2
 MAX_DECODED_SIZE = 64 * 1024**2
 MAX_PADDING = 15
 VERSION = b"\x00\x01\x01"
+STORED_VERSION = b"\x00\x01\x00"
 HEADER_SIZE = 16
 
 
@@ -27,36 +28,46 @@ def decode_wesys(data: bytes) -> tuple[bytes, dict]:
         raise ValueError("truncated WESYS header")
     if data[3:8] != b"WESYS":
         raise ValueError("not a WESYS payload")
-    if data[:3] != VERSION:
-        raise ValueError(f"unsupported WESYS version: {data[:3].hex()}")
-    compressed_size, decoded_size = struct.unpack_from("<II", data, 8)
-    if compressed_size > MAX_INPUT_SIZE - HEADER_SIZE:
-        raise ValueError("declared compressed size exceeds the input limit")
+    version = data[:3]
+    if version not in (VERSION, STORED_VERSION):
+        raise ValueError(f"unsupported WESYS version: {version.hex()}")
+    payload_size, size_field = struct.unpack_from("<II", data, 8)
+    stored = version == STORED_VERSION
+    if stored and size_field:
+        raise ValueError("unsupported stored WESYS header (expected zero at offset 12)")
+    if payload_size > MAX_INPUT_SIZE - HEADER_SIZE:
+        raise ValueError("declared payload size exceeds the input limit" if stored else
+                         "declared compressed size exceeds the input limit")
+    decoded_size = payload_size if stored else size_field
     if decoded_size > MAX_DECODED_SIZE:
         raise ValueError(f"decoded size exceeds the {MAX_DECODED_SIZE}-byte limit")
-    end = HEADER_SIZE + compressed_size
+    end = HEADER_SIZE + payload_size
     if end > len(data):
-        raise ValueError("truncated WESYS compressed payload")
+        raise ValueError("truncated WESYS payload")
     padding_size = len(data) - end
     if padding_size > MAX_PADDING or any(data[end:]):
         raise ValueError("unsupported trailing data (only up to 15 zero padding bytes are accepted)")
-    decoder = zlib.decompressobj()
-    try:
-        # The extra byte detects a false size declaration without unbounded inflate.
-        decoded = decoder.decompress(memoryview(data)[HEADER_SIZE:end], decoded_size + 1)
-    except zlib.error as exc:
-        raise ValueError(f"invalid WESYS zlib stream: {exc}") from exc
-    if len(decoded) > decoded_size or decoder.unconsumed_tail:
-        raise ValueError("decoded payload exceeds its declared size")
-    if not decoder.eof:
-        raise ValueError("incomplete WESYS zlib stream")
-    if decoder.unused_data:
-        raise ValueError("declared compressed payload contains data after the zlib stream")
-    if len(decoded) != decoded_size:
-        raise ValueError("decoded payload length differs from its declared size")
-    report = {"schema_version": 1, "format": "WESYS", "version_hex": VERSION.hex(),
+    if stored:
+        decoded = data[HEADER_SIZE:end]
+    else:
+        decoder = zlib.decompressobj()
+        try:
+            # The extra byte detects a false size declaration without unbounded inflate.
+            decoded = decoder.decompress(memoryview(data)[HEADER_SIZE:end], decoded_size + 1)
+        except zlib.error as exc:
+            raise ValueError(f"invalid WESYS zlib stream: {exc}") from exc
+        if len(decoded) > decoded_size or decoder.unconsumed_tail:
+            raise ValueError("decoded payload exceeds its declared size")
+        if not decoder.eof:
+            raise ValueError("incomplete WESYS zlib stream")
+        if decoder.unused_data:
+            raise ValueError("declared compressed payload contains data after the zlib stream")
+        if len(decoded) != decoded_size:
+            raise ValueError("decoded payload length differs from its declared size")
+    report = {"schema_version": 1, "format": "WESYS", "version_hex": version.hex(),
+              "compression": "none" if stored else "zlib", "payload_size_bytes": payload_size,
               "input_size_bytes": len(data), "input_sha256": hashlib.sha256(data).hexdigest(),
-              "compressed_size_bytes": compressed_size, "padding_size_bytes": padding_size,
+              "compressed_size_bytes": 0 if stored else payload_size, "padding_size_bytes": padding_size,
               "decoded_size_bytes": len(decoded),
               "decoded_sha256": hashlib.sha256(decoded).hexdigest(),
               "decoded_magic_hex": decoded[:32].hex()}

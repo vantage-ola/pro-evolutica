@@ -22,21 +22,34 @@ existing decoded entry and Android ball viewer help validate the asset side of
 the chain, but they do not implement PES's engine.
 
 The Windows executable and archive hashes match the supplied Mac/CrossOver
-copies. Ghidra maps the shared read-call address but cannot decode its on-disk
-bytes or assign a containing procedure. CrossOver's live Wine process executes
-a `ReadFile` call there, but this does not establish what native Windows runs
-at that address. See [the executable and runtime evidence](research/pes2013-engine.md).
+copies. The on-disk code view was insufficient, but the supplied Windows memory
+snapshots now expose the file-I/O and resource-loading code. Static calls,
+function tables and shared fields connect base-archive ID selection, entry
+streams, scheduling and WESYS decoding. Archive tables match all 10,189 entries
+in `dt0b`–`dt0e` across three snapshots. See
+[the loader evidence](research/pes2013-engine.md#resource-ids-archive-entries-and-the-decode-stage).
 
-Use the existing Windows PML as the primary evidence for original-game file
-access: it already records the successful 81,920-byte `dt0b.img` read, its
-offset and length, and the PES stack address. The matching executable and
-archive hashes connect that trace to the inspected files. The next code-level
-step is a bounded native Windows debugger capture of the instructions around
-the call, plus `ReadFile` arguments and return. Procmon does not record those
-details. Do not repeat the payload read under CrossOver to reconfirm the file
-access. Use CrossOver only for Wine-specific comparisons and Winlator to
-measure and improve how the game runs on Android. The viewer is a research
-tool, not a PES engine port.
+The first implementation is a Python prototype of the base route. It loads a
+resource by ID and reproduces the saved ball and animation bundle byte-for-byte.
+Stored and zlib WESYS variants pass bounds checks and synthetic tests. This
+does not establish original-routine equivalence: no captured routine was
+executed, and the sample IDs are derived rather than observed call arguments.
+
+The matching C++ loader now reproduces both samples in normal and sanitizer
+builds, and all eight native test targets pass. Its Android diagnostic now
+reproduces both outputs byte-for-byte on the Note20 and handles missing/corrupt
+input without terminating the viewer. Existing outputs and viewer assets are
+preserved. These decoded buffers are not yet connected to a consumer. See
+[the native loader checks](verification/native-resource.md).
+
+Next, trace the original code that uses decoded resources, using the saved
+Windows snapshots. Establish bundle-entry selection and data layout before
+choosing one bounded consumer to implement and compare. Extend the Android path
+after that component passes. Alternate providers and asynchronous scheduling
+remain outside the current loader's scope.
+The existing captures are sufficient for this work; no new game capture is
+needed now. Use CrossOver for Wine-specific comparisons and Winlator to measure
+and improve how the game runs on Android.
 See [the stack evidence](research/pes2013-engine.md#captured-file-io-stack-addresses).
 Runtime observations establish platform boundaries and loading order, but do
 not recover function instructions by themselves. Android verification follows

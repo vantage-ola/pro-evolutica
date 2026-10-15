@@ -4,6 +4,7 @@
 #include "../rendering/cube.h"
 #include "../diagnostics/frame_stats.h"
 #include "../animation/clip.h"
+#include "../assets/resource.h"
 #include <memory>
 #include <atomic>
 #include <algorithm>
@@ -15,6 +16,8 @@
 #include <fstream>
 #include <iomanip>
 #include <cstdio>
+#include <sstream>
+#include <sys/stat.h>
 
 namespace {
 struct App {
@@ -326,6 +329,58 @@ void load_texture(App& app) {
     }
 }
 
+void save_new_file(const std::string& path, const void* bytes, std::size_t size) {
+    auto* output = std::fopen(path.c_str(), "wbx");
+    if (!output) throw std::system_error(errno, std::generic_category(), "Create resource check output");
+    const auto written = std::fwrite(bytes, 1, size, output);
+    const int closed = std::fclose(output);
+    if (written != size || closed) throw std::runtime_error("Resource check output write failed");
+}
+
+void check_resources() {
+    try {
+        const char* directory = SDL_GetAndroidInternalStoragePath();
+        if (!directory) throw std::runtime_error("No app storage for resource check");
+        const std::string root = directory;
+        const auto output_directory = root + "/resource-check";
+        // A fresh directory prevents stale results or overwriting earlier checks.
+        if (mkdir(output_directory.c_str(), 0700))
+            throw std::system_error(errno, std::generic_category(), "Create fresh resource-check directory");
+        struct Sample { std::uint32_t id; const char* archive; const char* output; };
+        constexpr Sample samples[] = {{0x0b000011, "dt0b.img", "ball.bin"},
+                                      {0x0e000001, "dt0e.img", "animation.bin"}};
+        std::ostringstream report;
+        report << "resource_id,archive,status,entry_count,entry_offset,entry_size,decoded_size,decoded_crc32,output\n";
+        unsigned loaded = 0;
+        for (const auto& sample : samples) {
+            report << "0x" << std::hex << std::setfill('0') << std::setw(8) << sample.id
+                   << std::dec << ',' << sample.archive << ',';
+            try {
+                const auto resource = assets::load_resource(root + "/resource-img", sample.id);
+                save_new_file(output_directory + "/" + sample.output, resource.bytes.data(), resource.bytes.size());
+                const auto checksum = crc32(0, resource.bytes.data(), static_cast<uInt>(resource.bytes.size()));
+                report << "ok," << resource.entry_count << ',' << resource.entry_offset << ','
+                       << resource.entry_size << ',' << resource.bytes.size() << ',' << std::hex
+                       << std::setw(8) << checksum << std::dec << ',' << sample.output << '\n';
+                ++loaded;
+                SDL_Log("Resource loaded: id=0x%08x; entry offset=%u size=%u; decoded=%zu; CRC32=%08lx",
+                        sample.id, resource.entry_offset, resource.entry_size, resource.bytes.size(), checksum);
+            } catch (const std::exception& error) {
+                report << "error,,,,,,\n";
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Resource check id=0x%08x: %s", sample.id, error.what());
+            }
+        }
+        const auto text = report.str();
+        const auto temporary = output_directory + "/results.csv.tmp";
+        save_new_file(temporary, text.data(), text.size());
+        if (std::rename(temporary.c_str(), (output_directory + "/results.csv").c_str()))
+            throw std::system_error(errno, std::generic_category(), "Publish resource check report");
+        SDL_Log("Resource check complete: files/resource-check/results.csv; loaded=%u/2", loaded);
+    } catch (const std::exception& error) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Resource check failed: %s", error.what());
+    }
+}
+
 bool create(App& app) {
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight Portrait PortraitUpsideDown");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) return false;
@@ -366,11 +421,20 @@ bool create(App& app) {
     }
     SDL_free(gamepads);
     SDL_Log("Benchmark: keyboard B starts 5s warmup + 60s capture; input/background/resize cancels");
+    SDL_Log("Resource diagnostic: keyboard L reads files/resource-img into new files/resource-check");
     SDL_Log("Controls: drag orbit; pinch zoom; hold/release reset; PS4 left stick orbit, right stick Y zoom, Triangle reset, X tint, Options %s",app.clip ? "play/pause/replay" : "rotation");
     return true;
 }
 
 void handle_input(App& app, const SDL_Event& event) {
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_L) {
+        if (!event.key.repeat) {
+            cancel_capture(app, "resource check");
+            app.paused = true;
+            check_resources();
+        }
+        return;
+    }
     if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_B) {
         if (!event.key.repeat) begin_capture(app);
         return;

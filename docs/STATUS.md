@@ -19,8 +19,16 @@ that research, and a separate original football simulation is outside the curren
   symlink/special-file exclusion and explicit partial-scan errors.
 - `tools/afs_inspect.py`: bounded AFS entry-table inspection, archive hashes and
   extraction of one raw entry by index, with an output checksum.
-- `tools/wesys_unpack.py`: bounded zlib decoding of the observed WESYS variant,
-  with exact length/checksum checks and input/output hashes.
+- `tools/wesys_unpack.py`: bounded stored/zlib WESYS decoding, with exact length
+  checks, zlib checksum validation and input/output hashes.
+- `tools/pes_resource.py`: base-archive resource-ID loading for the checked
+  `dt0b`–`dt0e` selectors, reusing AFS/WESYS validation without a whole-archive scan.
+- `native/assets/resource.h` and `.cpp`: matching bounded C++ resource loading.
+  Ball/animation bytes agree with Python and saved samples. All eight native
+  targets pass normally and with sanitizers; the module builds into the ARM64
+  APK. The Note20 diagnostic reproduces both outputs byte-for-byte and handles
+  missing/corrupt inputs without terminating the viewer. See
+  [the native loader checks](verification/native-resource.md).
 - `tools/pes_texture.py`: bounds-checked bundle/WE00 inspection, byte-exact DXT1
   DDS extraction, mip metadata and a PNG preview of the largest level.
 - `tools/ktmdl_inspect.py`: bounded geometry metadata for observed little-endian
@@ -264,16 +272,67 @@ it advances the reader cursor and returns `1` through an indirect callback.
 Only the success path was observed; the failure branch and full routine entry
 remain unresolved. See [the successful read return](research/pes2013-engine.md#observed-read-routine-return).
 At the shared call site, the source executable contains undecodable bytes,
-while WineDbg observed a `ReadFile` import call in CrossOver memory. Procmon's
-Windows stack identifies the return address but does not include live code
-bytes or registers, so the next code capture needs to come from native Windows.
-No engine function or Windows frame-time measurement is claimed.
+while WineDbg observed a `ReadFile` import call in CrossOver memory. The supplied
+Windows menu/kickoff/replay minidumps now contain that same live instruction.
+All three dumps pass header, directory and captured-range checks; independent
+hashes agree. A second mapping check reproduces all nine bounded code windows,
+which are identical across states. The captured IAT target independently resolves
+to the 32-bit `kernel32.dll` export `ReadFile`.
+Ghidra now disassembles/decompiles the original read worker at `0x004f7970`,
+the open routine at `0x004f7740`, and size/seek helpers at `0x00505730` and
+`0x00505780`. The read worker uses chunks of at most 128 KiB rounded to 2,048-byte
+boundaries, consistent with the earlier padded archive read. These are file-I/O
+findings; no gameplay engine function has been recovered or ported. The dumps
+do not provide historical call arguments or prove the worker's error paths.
+The x32dbg capture was interrupted; the user reports immediate recovery after
+detachment. No additional device capture is currently needed. See
+[the snapshot findings](research/pes2013-engine.md#verified-windows-memory-snapshots).
+No gameplay engine function or Windows frame-time measurement is claimed.
+
+The read worker's background dispatch is now traced through submission,
+callback storage and invocation. A separate original helper at `0x01134d40`
+reads the known WESYS length fields and passes the payload to a zlib-compatible
+decoder at `0x01302ac0`. Ten bounded windows match across all three snapshots;
+the existing ball decoder reproduces its saved output and all 33 focused tests
+pass. See [the first loader findings](research/pes2013-engine.md#read-job-dispatch-and-wesys-compatible-decoding).
+
+The higher-level resource loader now connects archive selection, entry streams,
+the file scheduler and the decode stage through static calls, function tables
+and shared buffer fields. Captured sizes and calculated offsets match every
+entry in `dt0b`–`dt0e` across all three snapshots. A private base-archive check
+uses derived resource ID `0x0b000011` to read ball entry 17 directly from the
+archive and reproduce all 748,000 saved decoded bytes. This is not an execution
+check of the original routine or evidence that this ID was passed during the
+recorded match. See [the resource-loader route](research/pes2013-engine.md#resource-ids-archive-entries-and-the-decode-stage).
+
+The public Python loader now reproduces the saved ball and stored animation
+bundle directly from their archives using derived IDs `0x0b000011` and
+`0x0e000001`. All output bytes agree: 748,000 and 3,928,272 bytes respectively.
+The 89 focused tests and all 434 Python tests pass. Original-routine equivalence
+remains unverified; the later C++ device check is recorded below. See
+[the prototype checks](research/pes2013-engine.md#base-archive-loader-prototype).
+
+The corresponding C++ module now passes the same two real-file comparisons in
+normal and sanitizer builds. All eight native targets pass, including the new
+resource target's 134 synthetic checks. The offline ARM64 APK build and signature
+verification pass, with both loader functions present in `libmain.so`.
+
+The viewer's L-key diagnostic now invokes that loader on the Note20 using
+separate local archive copies. Both decoded outputs and entry metadata agree
+exactly with the host results. Missing archives and a synthetic corrupt zlib
+entry report errors without terminating the viewer; restoration succeeds.
+Existing results are protected from overwriting, prior viewer/benchmark files
+are unchanged, and animation playback still responds. The installed APK matches
+the checked build. These buffers are not yet consumed by the renderer or game
+systems. No new dependency or game capture was needed. See
+[the native resource record](verification/native-resource.md#note20-loading-verification).
 
 ## Next tasks
 
-1. Capture a small native Windows code window at `0x004f7a08`, plus the
-   `ReadFile` arguments and return. Procmon already supplies the file path,
-   offset, length and stack return address.
-2. Use those instructions to follow the caller toward WESYS decoding and model
-   loading. Keep CrossOver for Wine-specific comparisons and Winlator for
-   Android play and performance work.
+1. Use the saved Windows snapshots to trace the original code that consumes
+   decoded resources. Establish its bundle-entry selection and data layout.
+2. Choose one small consumer with supported instructions and sample data, then
+   implement and compare that behaviour before extending the Android path.
+3. Verify the resulting native component on the phone. Keep original-routine
+   execution comparisons and unsupported gameplay behaviour explicit; use the
+   existing captures before requesting more data.

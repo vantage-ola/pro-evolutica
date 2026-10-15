@@ -29,6 +29,58 @@ def _fingerprint(info: os.stat_result) -> tuple[int, int, int]:
     return info.st_size, info.st_mtime_ns, info.st_ctime_ns
 
 
+def _read_index(stream: BinaryIO, file_size: int) -> list[dict]:
+    magic, count = struct.unpack("<4sI", _read_exact(stream, 8))
+    if magic != b"AFS\0":
+        raise ValueError("not an AFS archive (expected AFS followed by a null byte)")
+    if count > MAX_ENTRIES:
+        raise ValueError(f"AFS exceeds the {MAX_ENTRIES}-entry limit")
+    table_end = 8 + count * 8
+    if table_end > file_size:
+        raise ValueError("truncated AFS entry table")
+    table = _read_exact(stream, count * 8)
+    entries = []
+    for index, (offset, size) in enumerate(struct.iter_unpack("<II", table)):
+        if offset > file_size or offset + size > file_size:
+            raise ValueError(f"entry {index} extends beyond the archive")
+        if size and offset < table_end:
+            raise ValueError(f"entry {index} overlaps the AFS header or entry table")
+        entries.append({"index": index, "offset": offset, "size_bytes": size})
+    return entries
+
+
+def read_afs_entry(path: Path | str, entry: int, *,
+                   max_size: int = MAX_EXTRACT_SIZE) -> tuple[bytes, dict]:
+    """Read one bounded entry after index validation, without hashing the archive."""
+    path = Path(path)
+    if not isinstance(entry, int) or entry < 0:
+        raise ValueError("entry index must be a non-negative integer")
+    if not 0 <= max_size <= MAX_EXTRACT_SIZE:
+        raise ValueError(f"entry read limit must be between 0 and {MAX_EXTRACT_SIZE}")
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    with os.fdopen(fd, "rb") as stream:
+        before = os.fstat(stream.fileno())
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("input must be a regular file")
+        if before.st_size > MAX_FILE_SIZE:
+            raise ValueError(f"input exceeds the {MAX_FILE_SIZE}-byte limit")
+        entries = _read_index(stream, before.st_size)
+        if entry >= len(entries):
+            raise ValueError(f"entry {entry} is outside the {len(entries)}-entry archive")
+        item = entries[entry]
+        if not item["size_bytes"]:
+            raise ValueError(f"entry {entry} is an empty slot")
+        if item["size_bytes"] > max_size:
+            raise ValueError(f"entry exceeds the {max_size}-byte read limit")
+        stream.seek(item["offset"])
+        data = _read_exact(stream, item["size_bytes"])
+        if _fingerprint(before) != _fingerprint(os.fstat(stream.fileno())):
+            raise ValueError("input changed during reading; retry with a stable file")
+    return data, {"schema_version": 1, "format": "AFS-entry", "file_name": path.name,
+                  "file_size": before.st_size, "entry_count": len(entries),
+                  "entry": item, "entry_sha256": hashlib.sha256(data).hexdigest()}
+
+
 def _extract(stream: BinaryIO, item: dict, output: Path) -> dict:
     if item["size_bytes"] == 0:
         raise ValueError(f"entry {item['index']} is an empty slot")
@@ -76,22 +128,8 @@ def inspect_afs(path: Path | str, *, entry: int | None = None,
             raise ValueError("input must be a regular file")
         if before.st_size > MAX_FILE_SIZE:
             raise ValueError(f"input exceeds the {MAX_FILE_SIZE}-byte limit")
-        magic, count = struct.unpack("<4sI", _read_exact(stream, 8))
-        if magic != b"AFS\0":
-            raise ValueError("not an AFS archive (expected AFS followed by a null byte)")
-        if count > MAX_ENTRIES:
-            raise ValueError(f"AFS exceeds the {MAX_ENTRIES}-entry limit")
-        table_end = 8 + count * 8
-        if table_end > before.st_size:
-            raise ValueError("truncated AFS entry table")
-        table = _read_exact(stream, count * 8)
-        entries = []
-        for index, (offset, size) in enumerate(struct.iter_unpack("<II", table)):
-            if offset > before.st_size or offset + size > before.st_size:
-                raise ValueError(f"entry {index} extends beyond the archive")
-            if size and offset < table_end:
-                raise ValueError(f"entry {index} overlaps the AFS header or entry table")
-            entries.append({"index": index, "offset": offset, "size_bytes": size})
+        entries = _read_index(stream, before.st_size)
+        count = len(entries)
         if entry is not None:
             if not count:
                 raise ValueError("archive has no entries to extract")

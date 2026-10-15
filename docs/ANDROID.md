@@ -303,3 +303,57 @@ The existing B benchmark measures static scenes and refuses animation scenes.
 Do not interpret the static ball's FPS as an animation or gameplay result.
 Device evidence and remaining limits are in
 [the playback record](verification/native-playback.md).
+
+## Check native resource loading
+
+The optional L-key diagnostic loads derived IDs `0x0b000011` and `0x0e000001`
+through the C++ archive reader. It reads `dt0b.img` and `dt0e.img` from the debug
+app's `files/resource-img` directory. It saves the decoded ball/animation bundles
+and a CSV report; these buffers do not replace the viewer's existing assets.
+The Note20's outputs now match the verified host samples byte-for-byte. See
+[the device checks](verification/native-resource.md#note20-loading-verification).
+
+Build and install the current debug APK as above. For initial setup, with
+`GAME_ROOT` pointing to the local PES 2013 installation, copy the whole archives:
+
+```bash
+adb shell run-as com.proevolutica.viewer mkdir files/resource-img &&
+adb shell -T run-as com.proevolutica.viewer tee files/resource-img/dt0b.img \
+  < "$GAME_ROOT/img/dt0b.img" > /dev/null &&
+adb shell -T run-as com.proevolutica.viewer tee files/resource-img/dt0e.img \
+  < "$GAME_ROOT/img/dt0e.img" > /dev/null
+
+adb shell run-as com.proevolutica.viewer sha256sum \
+  files/resource-img/dt0b.img files/resource-img/dt0e.img
+```
+
+The first command refuses an existing input directory. If these archives are
+already present, compare their hashes with the host files before using them.
+The verified copies from the device check are retained there. No storage
+permission is required, and no game data goes into the APK.
+
+With the viewer open, press L on a keyboard or send Android keycode 40:
+
+```bash
+adb shell input keyevent 40
+adb shell run-as com.proevolutica.viewer test -f files/resource-check/results.csv
+adb shell run-as com.proevolutica.viewer cat files/resource-check/results.csv
+```
+
+Wait for the report to exist before reading it. Each successful row has status
+`ok`, source entry metadata, decoded size/CRC32 and an output name. A failed
+resource has status `error`; details are in the app's logs. `Resource check
+complete` alone does not mean all resources loaded. Do not treat an `exec-out`
+exit status alone as proof that a remote file exists.
+
+Decoded files are `files/resource-check/ball.bin` and `animation.bin`. Collect
+them with `adb exec-out run-as com.proevolutica.viewer cat <path>` into new files
+under ignored local storage, then compare all bytes or SHA-256 with the host
+loader's outputs. Existing result directories are refused. After collecting a
+run, move `files/resource-check` to a new unused name before pressing L again;
+the successful verification results are currently retained at that path.
+
+The diagnostic pauses playback and cancels an active benchmark. Options/Space
+resumes or replays the existing animation. Loading errors leave the viewer
+running. This check verifies archive decoding, not original engine execution,
+model interpretation or gameplay performance.

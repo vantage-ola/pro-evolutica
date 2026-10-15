@@ -148,11 +148,13 @@ to print the report on stdout. Existing destinations are refused; parent
 directories must exist. Exit statuses are 0 for success, 1 for file/format errors
 and 2 for argument errors. Keep decoded content under ignored `private/`.
 
-This reader supports the observed `00 01 01 WESYS` header with little-endian
-compressed/decoded lengths and one complete zlib stream. It accepts up to 15 zero
-padding bytes after the declared compressed range, as seen in the local AFS
-entries. Other header variants, non-zero trailing data, concatenated streams,
-truncated data, checksum errors and incorrect decoded lengths are rejected.
+This reader supports `00 01 01 WESYS` with little-endian compressed/decoded
+lengths and one complete zlib stream. It also supports the observed stored
+`00 01 00 WESYS` layout: payload length at offset 8, zero at offset 12, and a
+direct payload copy from offset 16. It accepts up to 15 zero padding bytes after
+the declared payload range. Other header variants, non-zero trailing data,
+concatenated streams, truncated data, checksum errors and incorrect decoded
+lengths are rejected.
 
 Input and decoded output are each capped at 64 MiB. Decompression stops at the
 declared decoded length plus one byte, so a false small size cannot trigger
@@ -162,10 +164,48 @@ Size/timestamp checks detect common concurrent changes. File read errors and
 format errors create no decoded output; a later write/report failure may leave
 an output that should be discarded.
 
-Reports contain input and decoded SHA-256 hashes, header bytes, compressed and
-decoded sizes, zero-padding length and the first 32 decoded bytes in hex. The
-decoder does not classify, interpret or execute the contents. It uses Python's
-standard-library `zlib`; no new package is required.
+Reports contain input and decoded SHA-256 hashes, header bytes, compression kind,
+payload/decoded sizes, zero-padding length and the first 32 decoded bytes in hex.
+`compressed_size_bytes` is zero for stored payloads. The decoder does not
+classify, interpret or execute the contents. It uses Python's standard-library
+`zlib`; no new package is required.
+
+## Load a base-archive resource by ID
+
+```bash
+.venv/bin/python tools/pes_resource.py \
+  --img-dir "$GAME_ROOT/img" --id 0x0b000011 \
+  --output private/extracted/resource-ball.bin \
+  --json private/reports/resource-ball.json
+```
+
+This Python prototype joins the checked ID layout, AFS reader and WESYS decoder.
+The high byte selects `dt0b.img` through `dt0e.img` for selectors `0x0b` through
+`0x0e`; the lower 24 bits select a zero-based entry. Other selectors are refused.
+The example ID is derived from ball entry 17, not an observed call argument.
+It supports only the base-archive route. The game's alternate-provider lookup,
+loose files, asynchronous reads and callbacks are outside its scope.
+
+The loader validates the entire index, then reads only the selected entry's
+actual length. Sector padding is excluded. It does not scan other payloads or
+hash the whole archive. Reports identify the route, ID, archive name/size, entry
+index/offset/length, raw entry hash and WESYS metadata. The hash identifies the
+selected entry, not the archive as a whole.
+
+AFS limits are 8 GiB and 100,000 entries; raw WESYS input and decoded output are
+each capped at 64 MiB. Missing archives, empty slots, invalid IDs, unsupported
+wrappers and malformed data fail without a fallback. Use stable regular files;
+final archive paths cannot be symlinks. Size/timestamp checks detect common
+concurrent changes but do not provide a snapshot.
+
+Omit `--output` to decode and validate without saving bytes; omit `--json` to
+print the report. Existing files/symlinks are refused and parent directories
+must exist. Exit statuses are 0 for success, 1 for file/format errors and 2 for
+argument errors. A later write/report failure may leave an output; discard it
+after a failed command. Keep game data under ignored `private/`.
+See [the implementation checks](research/pes2013-engine.md#base-archive-loader-prototype).
+The matching C++ API and its host/Android build checks are documented in
+[native resource loading](verification/native-resource.md).
 
 ## Extract a verified DXT1 texture
 

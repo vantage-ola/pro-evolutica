@@ -31,11 +31,46 @@ def test_decoding_lengths_hashes_and_padding(payload, padding):
     assert decoded == payload
     assert report == {
         "schema_version": 1, "format": "WESYS", "version_hex": "000101",
+        "compression": "zlib", "payload_size_bytes": len(data) - 16 - padding,
         "input_size_bytes": len(data), "input_sha256": hashlib.sha256(data).hexdigest(),
         "compressed_size_bytes": len(data) - 16 - padding, "padding_size_bytes": padding,
         "decoded_size_bytes": len(payload), "decoded_sha256": hashlib.sha256(payload).hexdigest(),
         "decoded_magic_hex": payload[:32].hex(),
     }
+
+
+def stored(payload=b"synthetic stored payload", *, padding=0):
+    return b"\0\x01\0WESYS" + struct.pack("<II", len(payload), 0) + payload + bytes(padding)
+
+
+@pytest.mark.parametrize("payload, padding", [(b"", 0), (b"not a zlib stream", 15)])
+def test_stored_payload_is_copied_exactly(payload, padding):
+    decoded, report = wesys_unpack.decode_wesys(stored(payload, padding=padding))
+    assert decoded == payload
+    assert report["version_hex"] == "000100"
+    assert report["compression"] == "none"
+    assert report["compressed_size_bytes"] == 0
+    assert report["payload_size_bytes"] == report["decoded_size_bytes"] == len(payload)
+    assert report["decoded_sha256"] == hashlib.sha256(payload).hexdigest()
+    assert report["padding_size_bytes"] == padding
+
+
+@pytest.mark.parametrize("data, message", [
+    (set_size(stored(), 12, 1), "stored.*header"),
+    (set_size(stored(), 8, 0xffffffff), "payload size.*limit"),
+    (stored()[:-1], "truncated.*payload"),
+    (stored() + b"x", "trailing data"),
+    (stored(padding=16), "trailing data"),
+])
+def test_rejects_malformed_stored_wrapper(data, message):
+    with pytest.raises(ValueError, match=message):
+        wesys_unpack.decode_wesys(data)
+
+
+def test_stored_output_limit(monkeypatch):
+    monkeypatch.setattr(wesys_unpack, "MAX_DECODED_SIZE", 2)
+    with pytest.raises(ValueError, match="decoded size.*limit"):
+        wesys_unpack.decode_wesys(stored(b"abc"))
 
 
 @pytest.mark.parametrize("data, message", [
