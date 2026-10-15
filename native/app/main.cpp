@@ -6,6 +6,8 @@
 #include "../animation/clip.h"
 #include "../assets/resource.h"
 #include "../assets/texture.h"
+#include "../assets/bundle.h"
+#include "../assets/ktmdl.h"
 #include <memory>
 #include <atomic>
 #include <algorithm>
@@ -338,10 +340,23 @@ void show_archive_ball(App& app) {
         if (!directory) throw std::runtime_error("No app storage for archive ball");
         const std::string root = directory;
         const auto start = SDL_GetTicksNS();
-        const auto mesh = assets::load_obj(root + "/model.obj");
-        const auto texture_start = SDL_GetTicksNS();
         const auto resource = assets::load_resource(root + "/resource-img", 0x0b000011);
-        // Explicit selection for the checked ball only; material binding is unproved.
+        // Original ball consumer: entry 0 is KTMDL; model ID 2 binds entry 1.
+        // This assignment is specific to resource 0x0b000011, not ID minus one.
+        const auto entry = assets::bundle_entry(resource.bytes, 0);
+        const auto model = assets::decode_static_ktmdl({resource.bytes.begin()+entry.offset,
+            resource.bytes.begin()+entry.offset+entry.size});
+        const auto& mesh = model.mesh;
+        const assets::TextureReference* colour = nullptr;
+        for (const auto& ref : model.textures) {
+            if (ref.id_hi == 0 && ref.id_lo == 2) {
+                if (colour || ref.mode != 0 || ref.uv_channel != 0 || ref.parameter != 0)
+                    throw std::runtime_error("Unsupported ball colour binding");
+                colour = &ref;
+            }
+        }
+        if (!colour) throw std::runtime_error("Missing ball colour texture ID 2");
+        const auto texture_start = SDL_GetTicksNS();
         const auto image = assets::decode_bundle_texture(resource.bytes, 1);
         const auto upload = SDL_GetTicksNS();
         std::string error;
@@ -363,9 +378,11 @@ void show_archive_ball(App& app) {
         app.mesh_read_ms = double(texture_start-start)/1e6;
         app.image_read_ms = double(upload-texture_start)/1e6;
         reset_view(app);
-        SDL_Log("Archive ball ready: id=0x0b000011; texture entry=1; %ux%u RGBA8; pixels CRC32=%08lx; vertices=%zu triangles=%zu; upload=%.3f ms; paused",
+        SDL_Log("Archive ball ready: id=0x0b000011; model entry=0; colour ID=2; texture entry=1; %ux%u RGBA8; pixels CRC32=%08lx; vertices=%zu triangles=%zu; upload=%.3f ms; paused",
             image.width, image.height, app.texture_crc, app.mesh_vertices, app.mesh_triangles,
             double(finished-upload)/1e6);
+        SDL_Log("Archive ball mesh CRC32: vertices=%08lx; indices=%08lx; model texture references=%zu",
+            app.mesh_vertex_crc, app.mesh_index_crc, model.textures.size());
     } catch (const std::exception& error) {
         // Upload failure must not leave a GL error that aborts the retained scene.
         while (glGetError() != GL_NO_ERROR) {}
@@ -467,7 +484,7 @@ bool create(App& app) {
     SDL_free(gamepads);
     SDL_Log("Benchmark: keyboard B starts 5s warmup + 60s capture; input/background/resize cancels");
     SDL_Log("Resource diagnostic: keyboard L reads files/resource-img into new files/resource-check");
-    SDL_Log("Archive ball: keyboard T previews model.obj with dt0b.img resource 0x0b000011 texture entry 1");
+    SDL_Log("Archive ball: keyboard T previews dt0b.img resource 0x0b000011 model entry 0 and colour texture entry 1");
     SDL_Log("Controls: drag orbit; pinch zoom; hold/release reset; PS4 left stick orbit, right stick Y zoom, Triangle reset, X tint, Options %s",app.clip ? "play/pause/replay" : "rotation");
     return true;
 }

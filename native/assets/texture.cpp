@@ -1,4 +1,5 @@
 #include "texture.h"
+#include "bundle.h"
 
 #include <algorithm>
 #include <array>
@@ -23,19 +24,8 @@ Colour rgb565(std::uint16_t value) {
 } // namespace
 
 Image decode_bundle_texture(const std::vector<std::uint8_t>& bytes, std::size_t index) {
-    constexpr std::size_t limit = 64 * 1024 * 1024;
-    if (bytes.size() > limit || bytes.size() < 8) fail("Invalid texture bundle size");
-    const auto count = u32(bytes, 0), table = u32(bytes, 4);
-    if (!count || count > 4096 || table != 8 || index >= count)
-        fail("Unsupported texture bundle table or index");
-    const std::size_t end = 8 + std::size_t(count) * 12;
-    if (end > bytes.size()) fail("Truncated texture bundle table");
-    for (std::size_t i = 0; i < count; ++i) {
-        const auto offset = u32(bytes, 8 + i * 12), size = u32(bytes, 12 + i * 12);
-        if (offset > bytes.size() || size > bytes.size() - offset || (size && offset < end))
-            fail("Texture bundle entry is out of bounds");
-    }
-    const std::size_t offset = u32(bytes, 8 + index * 12), size = u32(bytes, 12 + index * 12);
+    const auto entry = bundle_entry(bytes, index);
+    const auto offset = entry.offset, size = entry.size;
     if (size < 16 || u32(bytes, offset) != 0x30304557 || bytes[offset + 6] != 0 ||
         bytes[offset + 7] != 0xff) fail("Unsupported WE00 texture header");
     const std::size_t length = u32(bytes, offset + 8);

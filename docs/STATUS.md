@@ -37,7 +37,7 @@ that research, and a separate original football simulation is outside the curren
   snapshots. The viewer's optional T-key preview now renders the archive-loaded
   colour texture on the Note20 with the matching host pixel CRC. Repeated loads
   and invalid/missing input handling pass; existing files are preserved. Geometry
-  still comes from the checked OBJ export. See
+  now comes directly from KTMDL through the reader below. See
   [the texture checks and limits](verification/native-texture.md).
 - `tools/pes_texture.py`: bounds-checked bundle/WE00 inspection, byte-exact DXT1
   DDS extraction, mip metadata and a PNG preview of the largest level.
@@ -48,7 +48,11 @@ that research, and a separate original football simulation is outside the curren
   numeric texture references. The ball's 682 vertices, 1,144 triangles and
   returned material fields match Python and the pinned independent reader.
   All ten native targets pass normally and with sanitizers; the offline ARM64
-  build passes. The module is not yet called by the viewer. See
+  build passes. The Note20 T-key preview loads geometry and colour directly from
+  the archive with both exported OBJ/PNG files unavailable. Host CRCs match;
+  paused scene pixels equal the previous export-based path. Missing archives,
+  corrupt models and missing bindings retain the previous scene; files are restored
+  unchanged. See
   [the native model checks](verification/native-ktmdl.md).
 - `tools/ktmdl_export.py`: one static packet exported to local OBJ with normals
   and UV0. The selected ball's six vertex attributes, indices, triangle order,
@@ -355,9 +359,9 @@ agree with the local ball metadata. No renderer code changed in this step. See
 
 ## Next tasks
 
-1. Use the verified native KTMDL reader and traced ball assignment to remove the
-   T-key preview's OBJ dependency. Keep unsupported packets/formats explicit and
-   preserve the current scene when loading fails. Compare its rendered output with the
-   existing preview on the Note20.
-2. Continue toward the original draw/update boundaries after this consumer is
-   verified. Use the existing captures before requesting more data.
+1. Trace an original drawable submission boundary from the verified ball objects
+   and material overrides toward the graphics calls, using the existing Windows
+   captures before requesting more data.
+2. Establish one bounded function's arguments, fields and observable result
+   before implementing another native component. General gameplay and original
+   GPU shading remain unverified.

@@ -1,4 +1,5 @@
 #include "../assets/texture.h"
+#include "../assets/bundle.h"
 
 #include <algorithm>
 #include <functional>
@@ -49,6 +50,16 @@ void changed(std::size_t offset, std::uint32_t value) {
 int main() {
     try {
         auto b = fixture();
+        const auto selected = assets::bundle_entry(b, 1);
+        require(selected.offset == 32 && selected.size == b.size()-32);
+        require(assets::bundle_entry(b, 0).size == 0);
+        // A range is format-neutral; a model record needs no WE00 marker.
+        auto model_bundle = b;
+        put32(model_bundle, 32, 0x444d544b);
+        require(assets::bundle_entry(model_bundle, 1).size == selected.size);
+        // Validate the unselected record too, even after selecting a valid one.
+        put32(model_bundle, 20, 0xffffffff);
+        reject([&] { assets::bundle_entry(model_bundle, 0); });
         auto image = assets::decode_bundle_texture(b, 1);
         require(image.width == 4 && image.height == 4 && image.rgba.size() == 64);
         require(Bytes(image.rgba.begin(), image.rgba.begin() + 16) ==

@@ -48,11 +48,11 @@ textures byte-for-byte against Python. All nine native targets and the offline
 ARM64 build pass. Named-file loading is not established for the numeric ball
 bundle; texture selection stays explicit. See [the checks](verification/native-texture.md).
 
-The optional T-key preview now renders the archive-loaded colour texture on the
-Note20, with the expected decoded pixel CRC, preserved inputs and working error
-handling. Geometry still comes from the checked OBJ export. The saved Windows
-snapshots now establish numeric ball selection and material binding, and the
-verified native KTMDL reader below is ready for preview integration. Alternate providers and
+The optional T-key preview now renders geometry and colour directly from the
+ball archive on the Note20, without the exported OBJ/PNG files. Geometry/texture
+CRCs match the host and scene pixels match the previous export-based path.
+Missing/corrupt inputs preserve the scene. The saved Windows snapshots establish
+numeric ball selection and the explicit material assignment used here. Alternate providers and
 asynchronous scheduling remain outside the current loader's scope.
 The existing captures are sufficient for this work; no new game capture is
 needed now. Use CrossOver for Wine-specific comparisons and Winlator to measure
@@ -236,8 +236,12 @@ The native static KTMDL reader now reproduces the ball's geometry and returned
 material fields against Python and the pinned independent reader. All ten native
 targets pass normally and with sanitizers, and the offline ARM64 build passes.
 See [the native model checks](verification/native-ktmdl.md).
-Next, replace the preview's OBJ input with this reader and verify the rendered
-result and failure handling on the Note20.
+The T-key preview now uses it directly on the Note20; matching pixels, missing
+exported files and loading failures are verified in
+[the device record](verification/native-ktmdl.md#note20-archive-preview).
+Next, trace an original drawable submission boundary from the captured ball
+objects and material overrides toward graphics calls. Establish its arguments,
+fields and observable result before implementing another native component.
 Do not apply the ball's texture assignment to unrelated resource types.
 
 ## Choose a porting route from engine evidence

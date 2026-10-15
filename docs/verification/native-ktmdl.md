@@ -3,8 +3,8 @@
 `native/assets/ktmdl.*` decodes the checked static model into the existing native
 mesh type. It retains positions, normals, UV0, ordered triangles and numeric
 texture references without an OBJ conversion or debug filenames. It adds no
-dependency. The module compiles into the Android library; the viewer does not
-call it yet.
+dependency. The Android viewer calls it through the optional T-key archive ball
+preview, verified separately below.
 
 ## Scope
 
@@ -74,9 +74,49 @@ The offline ARM64 build passes with the existing SDK XML warnings. Its APK is
 4,261,702 bytes, SHA-256
 `edc6b30ab1ca3e1cd29cf16aa09add3ee0268eff133dd2699299ac071bd8a51a`.
 This verifies compilation; device integration follows separately. The next step
-is to replace the T-key preview's OBJ input using the traced ball assignment,
-while preserving the previous scene on failure.
+was to replace the T-key preview's OBJ input using the traced ball assignment,
+while preserving the previous scene on failure. That integration follows below.
 
 Probe source, inputs, outputs and the comparison script/report remain ignored
 under `private/research/engine/native-ktmdl-01/`. Game assets are excluded from
 the APK and Git.
+
+## Note20 archive preview
+
+The T-key path now loads resource `0x0b000011`, selects numeric bundle entry 0
+and decodes it with the native KTMDL reader. It requires one colour reference
+with full ID `(0, 2)`, mode 0, parameter 0 and UV0, then uses bundle texture
+entry 1 according to the original ball assignment. This is a sample-specific
+adapter, not a general material resolver. Both uploads complete in a temporary
+renderer before replacing the existing scene.
+
+The existing bundle-table validation is shared by model and texture selection
+in `native/assets/bundle.*`. The texture target now has 227 checks, including
+four focused checks for the shared range API. All ten native targets pass
+normally and with AddressSanitizer/UBSan. The offline ARM64 APK builds, installs
+on the Note20 and matches its installed SHA-256. It is 4,264,342 bytes, SHA-256
+`f496ed8e74f7bc91e442e88abc0a8481ae7679133914f1b8f793321d3f850b71`.
+
+The phone loads the ball while both `model.obj` and `model.png` are temporarily
+unavailable. It reports 682 vertices, 1,144 triangles, three texture references
+and CRC32 values matching the host: vertices `d6f59e22`, indices `c65c6063` and
+colour RGBA `643dc8d1`. A paused comparison with the existing OBJ/PNG path has
+zero differing channels across the 840 × 2,030 scene interior (6,820,800 RGBA
+channels). Repeated loads and restoration produce the same pixels.
+
+Missing archive, damaged KTMDL header and missing colour-ID cases retain the
+same scene and process. Their scene pixels also match the baseline exactly.
+An initial screenshot comparison included transient Android notification
+overlays at rows 90–231; the accepted region starts at row 250 and excludes
+system bars and edge controls. No renderer change was needed.
+
+All eleven existing input/result files have unchanged hashes afterward;
+temporary moves are restored, including animation startup data. The app remains
+paused on the archive-loaded ball. Controller/camera behaviour was not changed
+or manually retested. Private scripts, logs, screenshots and comparison results
+are under `private/device/archive-model-01/`.
+
+The checked path now reaches rendered geometry and colour pixels without an
+OBJ/PNG conversion. It still uses our renderer and does not reproduce the
+original GPU shaders, normal/specular materials or game update logic. Continue
+with an original drawable submission boundary using the existing captures.
