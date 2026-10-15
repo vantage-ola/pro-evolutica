@@ -50,9 +50,9 @@ bundle; texture selection stays explicit. See [the checks](verification/native-t
 
 The optional T-key preview now renders the archive-loaded colour texture on the
 Note20, with the expected decoded pixel CRC, preserved inputs and working error
-handling. Geometry still comes from the checked OBJ export. Continue tracing
-original numeric bundle selection and material binding in the saved Windows
-snapshots before choosing the next consumer. Alternate providers and
+handling. Geometry still comes from the checked OBJ export. The saved Windows
+snapshots now establish numeric ball selection and material binding, and the
+verified native KTMDL reader below is ready for preview integration. Alternate providers and
 asynchronous scheduling remain outside the current loader's scope.
 The existing captures are sufficient for this work; no new game capture is
 needed now. Use CrossOver for Wine-specific comparisons and Winlator to measure
@@ -232,8 +232,12 @@ The base archive and texture readers now work on the Note20. The saved Windows
 snapshots also establish the original numeric ball consumer, KTMDL loader and
 explicit model-ID-to-texture assignment, including matching drawable overrides.
 See [the ball binding evidence](research/pes2013-engine.md#original-ball-bundle-and-texture-binding).
-Next, implement the checked static KTMDL packet reader in native code and compare
-its geometry and material metadata before replacing the preview's OBJ input.
+The native static KTMDL reader now reproduces the ball's geometry and returned
+material fields against Python and the pinned independent reader. All ten native
+targets pass normally and with sanitizers, and the offline ARM64 build passes.
+See [the native model checks](verification/native-ktmdl.md).
+Next, replace the preview's OBJ input with this reader and verify the rendered
+result and failure handling on the Note20.
 Do not apply the ball's texture assignment to unrelated resource types.
 
 ## Choose a porting route from engine evidence

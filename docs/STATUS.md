@@ -44,6 +44,12 @@ that research, and a separate original football simulation is outside the curren
 - `tools/ktmdl_inspect.py`: bounded geometry metadata for observed little-endian
   KTMDL 2.1/2.2 triangle-strip packets. Real samples from `dt0b.img` have checked
   geometry table ranges, finite positions and in-range indices.
+- `native/assets/ktmdl.*`: bounded decoding of one static KTMDL packet and its
+  numeric texture references. The ball's 682 vertices, 1,144 triangles and
+  returned material fields match Python and the pinned independent reader.
+  All ten native targets pass normally and with sanitizers; the offline ARM64
+  build passes. The module is not yet called by the viewer. See
+  [the native model checks](verification/native-ktmdl.md).
 - `tools/ktmdl_export.py`: one static packet exported to local OBJ with normals
   and UV0. The selected ball's six vertex attributes, indices, triangle order,
   identity bone and texture references match a pinned independent reader.
@@ -349,11 +355,9 @@ agree with the local ball metadata. No renderer code changed in this step. See
 
 ## Next tasks
 
-1. Implement a bounded native reader for the checked static KTMDL packet and its
-   material references. Compare geometry with the existing export and metadata
-   with the original captured objects before integrating it on the phone.
-2. Use that reader and the traced ball assignment to remove the T-key preview's
-   OBJ dependency. Keep unsupported packets/formats explicit and preserve the
-   current scene when loading fails.
-3. Continue toward the original draw/update boundaries after this consumer is
+1. Use the verified native KTMDL reader and traced ball assignment to remove the
+   T-key preview's OBJ dependency. Keep unsupported packets/formats explicit and
+   preserve the current scene when loading fails. Compare its rendered output with the
+   existing preview on the Note20.
+2. Continue toward the original draw/update boundaries after this consumer is
    verified. Use the existing captures before requesting more data.
