@@ -34,7 +34,10 @@ that research, and a separate original football simulation is outside the curren
   the independent macOS colour reference differs by at most 1/255. Nine native
   targets pass normally and with sanitizers; the offline ARM64 build passes.
   Original texture-header instructions are checked across all three Windows
-  snapshots. The viewer does not call this reader yet. See
+  snapshots. The viewer's optional T-key preview now renders the archive-loaded
+  colour texture on the Note20 with the matching host pixel CRC. Repeated loads
+  and invalid/missing input handling pass; existing files are preserved. Geometry
+  still comes from the checked OBJ export. See
   [the texture checks and limits](verification/native-texture.md).
 - `tools/pes_texture.py`: bounds-checked bundle/WE00 inspection, byte-exact DXT1
   DDS extraction, mip metadata and a PNG preview of the largest level.
@@ -336,10 +339,10 @@ systems. No new dependency or game capture was needed. See
 
 ## Next tasks
 
-1. Connect the checked archive/bundle colour texture reader to the viewer and
-   verify its output on the phone.
-2. Trace original numeric bundle selection and material binding in the saved
+1. Trace original numeric bundle selection and material binding in the saved
    Windows snapshots; keep the named-file consumer separate until linked.
-3. Choose the next bounded original consumer from that evidence. Keep
+2. Use that evidence to choose the next bounded consumer, including the mesh
+   boundary needed to remove the preview's OBJ conversion.
+3. Implement and compare the chosen component before another phone integration. Keep
    original-routine comparisons and unsupported behaviour explicit; use the
    existing captures before requesting more data.

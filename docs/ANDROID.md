@@ -357,3 +357,28 @@ The diagnostic pauses playback and cancels an active benchmark. Options/Space
 resumes or replays the existing animation. Loading errors leave the viewer
 running. This check verifies archive decoding, not original engine execution,
 model interpretation or gameplay performance.
+
+## Preview the ball with its archive texture
+
+With the checked ball export at `files/model.obj` and the verified whole
+`dt0b.img` at `files/resource-img/dt0b.img`, press keyboard T or send:
+
+```bash
+adb shell input keyevent 48
+```
+
+This explicitly selects derived resource ID `0x0b000011`, decodes its WESYS
+bundle and reads DXT1 texture entry 1. It uploads the decoded RGBA pixels
+directly; `model.png` is not read by this action. The geometry still uses the
+checked OBJ export, and texture binding is an explicit sample choice.
+
+The preview starts paused with reset framing/tint. Options/Space toggles
+rotation; the existing camera and tint controls apply. Restarting the app
+returns to its normal startup choice, including animation when present.
+Missing or invalid inputs retain the previous scene. Both GL uploads must
+succeed before the scene changes; repeating T reloads it. No input or result
+files are written. B refuses this preview because the existing startup
+benchmark fields would describe a different scene.
+
+The Note20 check and remaining scope are in
+[the native texture record](verification/native-texture.md#note20-preview).

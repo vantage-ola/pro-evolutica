@@ -3,8 +3,9 @@
 `native/assets/resource.h` and `.cpp` implement the checked base-archive route
 in C++17. The module uses zlib and POSIX file reads, with no SDL, graphics or
 Android API dependency. The viewer now invokes it through an optional diagnostic
-on the Note20. This verifies archive loading and decoding; it does not execute
-the original engine or connect these buffers to the renderer.
+on the Note20. That diagnostic verifies archive loading and decoding. The
+separate [T-key texture preview](native-texture.md#note20-preview) now connects
+the ball's decoded texture to the renderer. Neither executes the original engine.
 
 ## API and supported behaviour
 

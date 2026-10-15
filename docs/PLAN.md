@@ -39,7 +39,7 @@ The matching C++ loader now reproduces both samples in normal and sanitizer
 builds, and all eight native test targets pass. Its Android diagnostic now
 reproduces both outputs byte-for-byte on the Note20 and handles missing/corrupt
 input without terminating the viewer. Existing outputs and viewer assets are
-preserved. These decoded buffers are not yet connected to a consumer. See
+preserved. The separate texture preview now consumes the ball buffer below. See
 [the native loader checks](verification/native-resource.md).
 
 The next bounded consumer is now checked: original texture-header instructions
@@ -48,10 +48,12 @@ textures byte-for-byte against Python. All nine native targets and the offline
 ARM64 build pass. Named-file loading is not established for the numeric ball
 bundle; texture selection stays explicit. See [the checks](verification/native-texture.md).
 
-Next connect the archive-loaded colour texture to the viewer, verify its phone
-output, then continue tracing original numeric bundle selection and material
-binding in the saved Windows snapshots. Alternate providers and asynchronous
-scheduling remain outside the current loader's scope.
+The optional T-key preview now renders the archive-loaded colour texture on the
+Note20, with the expected decoded pixel CRC, preserved inputs and working error
+handling. Geometry still comes from the checked OBJ export. Continue tracing
+original numeric bundle selection and material binding in the saved Windows
+snapshots before choosing the next consumer. Alternate providers and
+asynchronous scheduling remain outside the current loader's scope.
 The existing captures are sufficient for this work; no new game capture is
 needed now. Use CrossOver for Wine-specific comparisons and Winlator to measure
 and improve how the game runs on Android.

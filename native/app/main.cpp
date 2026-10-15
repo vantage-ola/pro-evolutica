@@ -5,6 +5,7 @@
 #include "../diagnostics/frame_stats.h"
 #include "../animation/clip.h"
 #include "../assets/resource.h"
+#include "../assets/texture.h"
 #include <memory>
 #include <atomic>
 #include <algorithm>
@@ -41,6 +42,7 @@ struct App {
     int colour = 0;
     bool vsync = false;
     bool mesh_loaded = false;
+    bool archive_ball = false;
     bool paused = false;
     float angle = .6f;
     // Android can deliver lifecycle events from a different thread.
@@ -151,8 +153,8 @@ void cancel_capture(App& app, const char* reason) {
 }
 
 void begin_capture(App& app) {
-    if (app.clip) {
-        SDL_Log("Benchmark: static scenes only; remove animation.pva and restart for the ball benchmark");
+    if (app.clip || app.archive_ball) {
+        SDL_Log("Benchmark: startup static scenes only; remove animation.pva and restart for the PNG ball benchmark");
         return;
     }
     if (app.capture.active()) { cancel_capture(app,"B pressed again"); return; }
@@ -329,6 +331,49 @@ void load_texture(App& app) {
     }
 }
 
+void show_archive_ball(App& app) {
+    Cube replacement;
+    try {
+        const char* directory = SDL_GetAndroidInternalStoragePath();
+        if (!directory) throw std::runtime_error("No app storage for archive ball");
+        const std::string root = directory;
+        const auto start = SDL_GetTicksNS();
+        const auto mesh = assets::load_obj(root + "/model.obj");
+        const auto texture_start = SDL_GetTicksNS();
+        const auto resource = assets::load_resource(root + "/resource-img", 0x0b000011);
+        // Explicit selection for the checked ball only; material binding is unproved.
+        const auto image = assets::decode_bundle_texture(resource.bytes, 1);
+        const auto upload = SDL_GetTicksNS();
+        std::string error;
+        if (!replacement.create(error) || !replacement.set_mesh(mesh, error) ||
+            !replacement.set_texture(image, error)) throw std::runtime_error(error);
+        const auto finished = SDL_GetTicksNS();
+        // Commit both uploads together so failures preserve the previous scene.
+        std::swap(app.cube, replacement);
+        app.playback.reset();
+        app.clip.reset();
+        app.archive_ball = true;
+        app.mesh_loaded = true;
+        app.mesh_vertices = mesh.vertices.size(); app.mesh_triangles = mesh.indices.size()/3;
+        app.mesh_vertex_crc = crc32(0, reinterpret_cast<const Bytef*>(mesh.vertices.data()),
+            static_cast<uInt>(mesh.vertices.size()*sizeof(assets::MeshVertex)));
+        app.mesh_index_crc = crc32(0, reinterpret_cast<const Bytef*>(mesh.indices.data()),
+            static_cast<uInt>(mesh.indices.size()*sizeof(std::uint16_t)));
+        app.texture_crc = crc32(0, image.rgba.data(), static_cast<uInt>(image.rgba.size()));
+        app.mesh_read_ms = double(texture_start-start)/1e6;
+        app.image_read_ms = double(upload-texture_start)/1e6;
+        reset_view(app);
+        SDL_Log("Archive ball ready: id=0x0b000011; texture entry=1; %ux%u RGBA8; pixels CRC32=%08lx; vertices=%zu triangles=%zu; upload=%.3f ms; paused",
+            image.width, image.height, app.texture_crc, app.mesh_vertices, app.mesh_triangles,
+            double(finished-upload)/1e6);
+    } catch (const std::exception& error) {
+        // Upload failure must not leave a GL error that aborts the retained scene.
+        while (glGetError() != GL_NO_ERROR) {}
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Archive ball: %s; previous scene retained", error.what());
+    }
+    replacement.destroy();
+}
+
 void save_new_file(const std::string& path, const void* bytes, std::size_t size) {
     auto* output = std::fopen(path.c_str(), "wbx");
     if (!output) throw std::system_error(errno, std::generic_category(), "Create resource check output");
@@ -422,11 +467,19 @@ bool create(App& app) {
     SDL_free(gamepads);
     SDL_Log("Benchmark: keyboard B starts 5s warmup + 60s capture; input/background/resize cancels");
     SDL_Log("Resource diagnostic: keyboard L reads files/resource-img into new files/resource-check");
+    SDL_Log("Archive ball: keyboard T previews model.obj with dt0b.img resource 0x0b000011 texture entry 1");
     SDL_Log("Controls: drag orbit; pinch zoom; hold/release reset; PS4 left stick orbit, right stick Y zoom, Triangle reset, X tint, Options %s",app.clip ? "play/pause/replay" : "rotation");
     return true;
 }
 
 void handle_input(App& app, const SDL_Event& event) {
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_T) {
+        if (!event.key.repeat) {
+            cancel_capture(app, "archive ball preview");
+            show_archive_ball(app);
+        }
+        return;
+    }
     if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_L) {
         if (!event.key.repeat) {
             cancel_capture(app, "resource check");

@@ -3,7 +3,8 @@
 `native/assets/texture.*` reads an explicitly selected texture from a decoded
 PES bundle and returns the largest mip as top-row-first RGBA8. This removes the
 need for a PNG conversion at that boundary. It uses the existing `assets::Image`
-type and adds no dependency. The Android viewer does not call it yet.
+type and adds no dependency. The Android viewer calls it through the optional
+T-key ball preview; normal startup keeps its existing asset choice.
 
 ## Original code evidence
 
@@ -46,8 +47,9 @@ pixels. It refuses DXT5, cube/volume textures and unsupported headers.
 The DXT1 implementation retains the existing Python decoder's rounding,
 including transparent selector 3 when the first endpoint is less than or equal
 to the second. Lower mips are length-checked; only the largest is decoded.
-Material IDs, automatic texture binding, named bundles, GPU upload and the
-original mip-selection policy are outside this implementation.
+Material IDs, automatic texture binding, named bundles and the original
+mip-selection policy are outside this reader. The preview uploads its output
+through the existing RGBA renderer, which generates its own mips.
 
 ## Verification
 
@@ -85,6 +87,45 @@ The model entry and DXT5 normal texture are explicitly rejected.
 The offline Android build passes with the existing SDK XML warnings. The APK is
 4,198,814 bytes, SHA-256
 `14a7b6142f905505b7c7ac979528ba57350041ece97a3a1922c98755954f6f5e`.
-This reader is compiled for ARM64 but has no device execution check yet. The
-previous installed APK and viewer inputs were left in place. Next connect the
-checked colour texture to the viewer and compare its phone output.
+That build established ARM64 compilation. Device integration follows below.
+
+## Note20 preview
+
+The T-key adapter loads the checked `model.obj` and the original archive's
+colour texture into a temporary renderer, then swaps it into the app only when
+both uploads succeed. It clears animation playback and resets the static
+scene, paused. Failed reads or decoding leave the previous scene intact.
+The default animation startup and the separate L-key diagnostic are retained.
+
+The offline integration APK builds successfully and is installed on the Note20
+SM_N981U. It is 4,201,430 bytes, SHA-256
+`2dca018985e34f1aed4c6afad8146577618604176d5569f666fb48c7b26aaa28`;
+the installed APK hash matches. The phone reports 512 × 512 RGBA8 with CRC32
+`643dc8d1`, matching the host's decoded colour pixels, and 682 mesh vertices /
+1,144 triangles. The saved screenshot shows the blue/yellow ball with coherent
+panel and logo placement. This checks our renderer, not the original game's
+rendering or material behaviour.
+
+A matched paused PNG/archive pair in the same process has zero differing
+channels across the 2,160 × 880 scene region (7,603,200 RGBA channels), excluding
+Android bars and edge overlays. The first comparison was discarded because
+the PNG scene had not received its reset event and was still rotating; some
+early captures also changed orientation. The accepted pair waits for logged
+startup/reset completion and uses the same landscape viewport for both paths.
+
+Repeated T loads and missing archive/model inputs pass. A synthetic archive
+with an empty selected slot is refused. The viewer process survives these
+cases, preserves the scene and loads the restored archive again. Rotation,
+camera movement and reset respond to ADB keyboard input. B refuses the preview
+benchmark. These checks do not repeat the earlier manual PS4/touch review.
+
+All six existing viewer/benchmark files, both archive copies and the three
+existing L-diagnostic outputs have unchanged SHA-256 values after verification.
+Temporary input moves were restored; the installed preview remains paused on
+the ball. No new dependency or public asset was added. The portable readers
+were unchanged, so their previously passing nine normal/sanitizer CTest targets
+were not rerun for this Android adapter.
+
+Private scripts, process-filtered logs, input hashes and screenshots are under
+`private/device/archive-texture-01/`. Geometry still requires the OBJ export;
+the next engine investigation is numeric bundle selection and material binding.
