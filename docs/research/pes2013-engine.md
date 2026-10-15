@@ -703,6 +703,23 @@ records and treats `.tex` entries separately. It supports whole-bundle and
 per-entry decoding on different branches. This does not establish that the ball
 uses this particular named-bundle consumer.
 
+Further tracing resolves the `.tex` factory call at `0x00cc11f4` to
+`0x011ca190`. It dispatches on byte 7; the `0xff` arm calls `0x0042c490`, then
+`0x011cb230` and `0x011caee0`. For type byte 6 equal to zero, that initializer
+copies the wrapper plus its declared payload length and reads dimensions at the
+positions occupied by the checked WE00/DDS headers. Six memory windows and the
+emitted instructions agree across all three snapshots. This establishes a
+texture-header consumer, not that the ball historically reached it through the
+named-file loader. In particular, the ball/animation records' third word is
+`0xfffffff0`, rather than an established usable name offset.
+
+The bounded native texture reader now selects an explicit numeric entry and
+decodes the supported DXT1 payload. Both real ball DXT1 images match Python
+byte-for-byte; the independent colour reference retains its known maximum
+1/255 rounding difference. Original texture construction, GPU behaviour,
+material binding and mip selection are not reimplemented by this check. See
+[the native texture evidence](../verification/native-texture.md).
+
 **Working base-archive check.** Applying the inferred ID layout to ball entry 17
 gives candidate ID `0x0b000011`. A private check selects `dt0b.img`, reads offset
 5,992,448 and its actual 81,872 bytes, then uses our existing WESYS decoder. Both

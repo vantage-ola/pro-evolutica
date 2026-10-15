@@ -29,6 +29,13 @@ that research, and a separate original football simulation is outside the curren
   APK. The Note20 diagnostic reproduces both outputs byte-for-byte and handles
   missing/corrupt inputs without terminating the viewer. See
   [the native loader checks](verification/native-resource.md).
+- `native/assets/texture.*`: explicit bundle entry selection and bounded
+  WE00/DXT1 decoding to RGBA. Both ball DXT1 images match Python byte-for-byte;
+  the independent macOS colour reference differs by at most 1/255. Nine native
+  targets pass normally and with sanitizers; the offline ARM64 build passes.
+  Original texture-header instructions are checked across all three Windows
+  snapshots. The viewer does not call this reader yet. See
+  [the texture checks and limits](verification/native-texture.md).
 - `tools/pes_texture.py`: bounds-checked bundle/WE00 inspection, byte-exact DXT1
   DDS extraction, mip metadata and a PNG preview of the largest level.
 - `tools/ktmdl_inspect.py`: bounded geometry metadata for observed little-endian
@@ -329,10 +336,10 @@ systems. No new dependency or game capture was needed. See
 
 ## Next tasks
 
-1. Use the saved Windows snapshots to trace the original code that consumes
-   decoded resources. Establish its bundle-entry selection and data layout.
-2. Choose one small consumer with supported instructions and sample data, then
-   implement and compare that behaviour before extending the Android path.
-3. Verify the resulting native component on the phone. Keep original-routine
-   execution comparisons and unsupported gameplay behaviour explicit; use the
+1. Connect the checked archive/bundle colour texture reader to the viewer and
+   verify its output on the phone.
+2. Trace original numeric bundle selection and material binding in the saved
+   Windows snapshots; keep the named-file consumer separate until linked.
+3. Choose the next bounded original consumer from that evidence. Keep
+   original-routine comparisons and unsupported behaviour explicit; use the
    existing captures before requesting more data.
