@@ -48,8 +48,9 @@ that research, and a separate original football simulation is outside the curren
   and UV0. The selected ball's six vertex attributes, indices, triangle order,
   identity bone and texture references match a pinned independent reader.
   All 1,144 triangles have positive area and agree with the vertex normals.
-  Texture selection is supported by the IDs and visual checks of the three
-  bundle images; the binding convention remains sample-specific. Android model
+  The original ball setup now confirms the sample's IDs 2/3/4 bind bundle
+  textures 1/2/3, with matching override tables in the Windows snapshots. This
+  assignment remains specific to the traced ball path. Android model
   rendering and the visual UV check now pass for this ball.
 - The native triangle runs on the Note20, with screenshot/log evidence for
   rendering, touch, PS4 X-button input, background/resume and Android Back.
@@ -337,12 +338,22 @@ the checked build. These buffers are not yet consumed by the renderer or game
 systems. No new dependency or game capture was needed. See
 [the native resource record](verification/native-resource.md#note20-loading-verification).
 
+The original numeric ball consumer now connects entry 0 to the KTMDL loader and
+entries 1–3 to the texture factory. Both match snapshots retain resource ID
+`0x0b000011`, two matching model metadata copies and drawable override tables
+containing the expected three runtime texture IDs. The model/texture assignment
+is explicit in the original setup code. All 21 code windows and 7,734 emitted
+instructions agree across menu, kickoff and replay; the captured binding tables
+agree with the local ball metadata. No renderer code changed in this step. See
+[the original ball binding](research/pes2013-engine.md#original-ball-bundle-and-texture-binding).
+
 ## Next tasks
 
-1. Trace original numeric bundle selection and material binding in the saved
-   Windows snapshots; keep the named-file consumer separate until linked.
-2. Use that evidence to choose the next bounded consumer, including the mesh
-   boundary needed to remove the preview's OBJ conversion.
-3. Implement and compare the chosen component before another phone integration. Keep
-   original-routine comparisons and unsupported behaviour explicit; use the
-   existing captures before requesting more data.
+1. Implement a bounded native reader for the checked static KTMDL packet and its
+   material references. Compare geometry with the existing export and metadata
+   with the original captured objects before integrating it on the phone.
+2. Use that reader and the traced ball assignment to remove the T-key preview's
+   OBJ dependency. Keep unsupported packets/formats explicit and preserve the
+   current scene when loading fails.
+3. Continue toward the original draw/update boundaries after this consumer is
+   verified. Use the existing captures before requesting more data.

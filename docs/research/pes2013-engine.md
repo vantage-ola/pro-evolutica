@@ -737,6 +737,60 @@ Their absence does not show that the route was unused earlier. No original
 instructions were executed. Evidence and the reproducible local check remain
 under ignored `windows-capture-01/loader-chain-01/`.
 
+### Original ball bundle and texture binding
+
+The numeric consumer at `0x00409fc0` passes bundle entry 0 twice to the model
+factory `0x01151430`, retaining two model objects. It passes entries 1, 2 and 3
+to the previously traced texture factory. The enclosing resource object's
+fields `0xa0`/`0xa4` hold the models; `0xa8`/`0xac`/`0xb0` hold the textures.
+This path does not interpret the bundle records' third word as a filename.
+
+The model factory calls `0x01150b00`, which checks the KTMDL signature and
+little-endian marker, then consumes the packet, material and 16-byte texture-ID
+tables. The packet constructor is `0x011493c0`. The metadata-copy routine at
+`0x01150390` retains the header/tables and relocates each stream's data offset;
+the captured runtime header should therefore not be treated as a standalone
+model file.
+
+The entity setup routine `0x012369f0` supplies the explicit texture assignment:
+
+- Model texture ID 2 receives the runtime texture ID from resource field `0xa8`
+  (bundle entry 1, the colour image).
+- Model texture ID 3 receives field `0xac` (entry 2, the normal image).
+- Model texture ID 4 receives field `0xb0` (entry 3, the specular image).
+
+These calls reach `0x011e8ed0`, then `0x0114a400`. The latter compares all four
+32-bit words of each model texture ID and writes the matching replacement into
+the drawable's override table. This establishes the assignment for this ball
+path; **subtracting one from any model texture ID is not a general bundle rule**.
+The checked packet references IDs 4, 3 and 2 through its mode 2, 1 and 0 records,
+respectively, agreeing with the source names and the earlier material metadata.
+
+The kickoff and replay snapshots provide matching state, beyond static calls:
+
+- Resource object `0x2240c200` contains ID `0x0b000011` at loader offset `0x2c`
+  (enclosing-object offset `0x74`). Its embedded loader's function table selects
+  `0x00409fc0`. The ID is now observed in captured loader state, though not as a
+  historical call argument.
+- Both retained models match all 1,216 source metadata bytes except the two
+  relocated stream offsets. Their copied 16-byte texture IDs match exactly.
+- The three texture objects have runtime IDs 3295, 3296 and 3297. Two drawable
+  override tables at kickoff and four at replay map the model IDs to precisely
+  those values; all three replacement flags are set in each table.
+
+The read-only check compares 21 code windows (256 KiB) and 7,734 emitted
+instructions across all three snapshots, validates 16 direct calls and 17
+instruction operands, and checks the captured objects against the local ball
+bundle. The private project, scripts and `checks.json` are under
+`windows-capture-01/material-binding-01/`. No original instructions were executed.
+The source bundle is unchanged. GPU pixels, shaders and normal/specular rendering
+are not verified by these state comparisons.
+
+This supplies a concrete next consumer: decode the checked static KTMDL packet
+directly in native code, compare its geometry and material references with the
+existing export, then remove the preview's OBJ dependency. Keep the ball's
+explicit binding separate from other resource types.
+
 ### Base-archive loader prototype
 
 `tools/pes_resource.py` implements the checked base route in Python: split the

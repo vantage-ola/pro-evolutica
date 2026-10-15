@@ -228,6 +228,14 @@ behaviour description and a repeatable comparison. If static code is unavailable
 state the blocker and design a bounded observation of the legitimately running
 game. Do not infer or bypass its protection mechanism.
 
+The base archive and texture readers now work on the Note20. The saved Windows
+snapshots also establish the original numeric ball consumer, KTMDL loader and
+explicit model-ID-to-texture assignment, including matching drawable overrides.
+See [the ball binding evidence](research/pes2013-engine.md#original-ball-bundle-and-texture-binding).
+Next, implement the checked static KTMDL packet reader in native code and compare
+its geometry and material metadata before replacing the preview's OBJ input.
+Do not apply the ball's texture assignment to unrelated resource types.
+
 ## Choose a porting route from engine evidence
 
 Keep the original game logic as the target. Evaluate whether the observed
