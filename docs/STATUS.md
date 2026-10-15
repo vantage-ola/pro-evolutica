@@ -360,8 +360,10 @@ agree with the local ball metadata. No renderer code changed in this step. See
 ## Next tasks
 
 1. Trace an original drawable submission boundary from the verified ball objects
-   and material overrides toward the graphics calls, using the existing Windows
-   captures before requesting more data.
+   and material overrides toward graphics calls. The existing captures now
+   verify object construction, model-pointer ownership and one model-dependent
+   CPU table build; follow that table and virtual-method uses before requesting
+   more data.
 2. Establish one bounded function's arguments, fields and observable result
    before implementing another native component. General gameplay and original
    GPU shading remain unverified.

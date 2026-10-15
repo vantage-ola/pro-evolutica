@@ -786,10 +786,42 @@ bundle. The private project, scripts and `checks.json` are under
 The source bundle is unchanged. GPU pixels, shaders and normal/specular rendering
 are not verified by these state comparisons.
 
-This supplies a concrete next consumer: decode the checked static KTMDL packet
-directly in native code, compare its geometry and material references with the
-existing export, then remove the preview's OBJ dependency. Keep the ball's
-explicit binding separate from other resource types.
+### Drawable-object lifecycle trace
+
+The matching Windows snapshots expose the constructor and cleanup path for the
+object whose vtable is `0x0152abc0`, also present in the ball override records.
+The code pages containing the constructor references are byte-identical in the
+menu, kickoff and replay dumps; extracted pages and Ghidra output are kept under
+ignored `private/research/engine/windows-capture-01/draw-boundary-01/`. The
+read-only `verify-boundary.py` checks the direct-call targets and page equality
+across all three dumps.
+
+- `0x0114a8d0` initializes the object with that vtable, identity-matrix values,
+  zeroed state, and fields through `+0x17c`.
+- `0x0114c230` performs similar initialization and stores its incoming pointer
+  at `+0x120`. Three direct callers appear at `0x011d4329`, `0x011e6aba` and
+  `0x01231f2e` in all three snapshots. The caller at `0x011d4329` reads a
+  count from the nested object at `+0x38`, then copies 16-dword records from
+  `+0x3c` at `0x50`-byte strides into a new table with `0x44`-byte strides.
+  This is a verified CPU-side data transformation; the record meaning and its
+  connection to rendering are still unknown.
+- `0x0114b070` reads and clears `+0x120`. If it holds an object, the routine
+  decrements the reference count with `KERNEL32!InterlockedDecrement` and calls
+  the child object's first virtual method when the count reaches zero. It then
+  calls `0x0114a9d0`, which releases and clears numerous sibling fields. Its
+  wrapper at `0x00447710` is a cleanup path.
+
+This verifies construction and ownership around the model pointer, not that this
+class submits a mesh to the GPU. The inspected path reaches reference-counting
+and object cleanup; it does not identify a Direct3D draw method. The executable's
+`Direct3DCreate9` import remains a graphics anchor only. The render submission
+boundary is still open, so this trace is not a recovered or ported gameplay
+function.
+
+The next bounded step is to follow that derived table and the captured
+virtual-method use around the `+0x120` model pointer toward a verified graphics
+call, using the existing captures before requesting another one. Keep the
+ball's explicit binding separate from other resource types.
 
 ### Base-archive loader prototype
 
