@@ -9,19 +9,38 @@ constexpr const char* vertex_source = R"(#version 300 es
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec2 uv;
 layout(location = 2) in vec3 normal;
+layout(location = 3) in uvec4 bone_indices;
+layout(location = 4) in float bone_weight;
 uniform mat4 transform;
 uniform mat4 rotation;
 uniform bool mesh_mode;
+uniform bool skinned;
+uniform bool has_weight;
+uniform mat4 skin_palette[32];
 uniform vec3 centre;
 uniform float scale;
 out vec2 texture_uv;
 out float face_light;
 void main() {
-    gl_Position = transform * vec4((position - centre) * scale, 1.0);
+    vec4 source_position = vec4(position, 1.0);
+    vec3 source_normal = normal;
+    if (skinned) {
+        vec4 first = skin_palette[bone_indices.x] * source_position;
+        if (has_weight) {
+            vec4 second = skin_palette[bone_indices.y] * source_position;
+            source_position = first * bone_weight + second * (1.0 - bone_weight);
+            source_normal = mat3(skin_palette[bone_indices.x]) * normal * bone_weight +
+                            mat3(skin_palette[bone_indices.y]) * normal * (1.0 - bone_weight);
+        } else {
+            source_position = first;
+            source_normal = mat3(skin_palette[bone_indices.x]) * normal;
+        }
+    }
+    gl_Position = transform * vec4((source_position.xyz - centre) * scale, 1.0);
     // The extracted mesh retains top-first source UVs; the original cube uses
     // bottom-first UVs. No image bytes are flipped or changed.
     texture_uv = mesh_mode ? uv : vec2(uv.x, 1.0 - uv.y);
-    face_light = mesh_mode ? 0.3 + 0.7 * max(dot(mat3(rotation) * normalize(normal),
+    face_light = mesh_mode ? 0.3 + 0.7 * max(dot(mat3(rotation) * normalize(source_normal),
         normalize(vec3(0.4, 0.7, 1.0))), 0.0) : normal.x;
 }
 )";
@@ -91,6 +110,9 @@ bool Cube::create(std::string& error) {
     mesh_mode_ = glGetUniformLocation(program_, "mesh_mode");
     centre_uniform_ = glGetUniformLocation(program_, "centre");
     scale_uniform_ = glGetUniformLocation(program_, "scale");
+    skinned_ = glGetUniformLocation(program_, "skinned");
+    skin_palette_ = glGetUniformLocation(program_, "skin_palette[0]");
+    has_weight_ = glGetUniformLocation(program_, "has_weight");
     const GLint image = glGetUniformLocation(program_, "image");
     glGenVertexArrays(1, &array_);
     glBindVertexArray(array_);
@@ -128,11 +150,138 @@ bool Cube::create(std::string& error) {
     glCullFace(GL_BACK);
     if (glGetError() != GL_NO_ERROR || transform_ < 0 || tint_ < 0 || image < 0 ||
         rotation_ < 0 || mesh_mode_ < 0 || centre_uniform_ < 0 || scale_uniform_ < 0 ||
+        skinned_ < 0 || skin_palette_ < 0 || has_weight_ < 0 ||
         !array_ || !vertices_ || !indices_ || !texture_) {
         error = "Cannot initialise cube buffers, texture or uniforms";
         destroy();
         return false;
     }
+    return true;
+}
+
+bool Cube::set_skinned_model(const assets::SkinnedModel& model, std::string& error) {
+    if (model.bones.empty() || model.bones.size() > 32 || model.packets.empty()) {
+        error = "Skinned model exceeds renderer bone/packet limits";
+        return false;
+    }
+    std::vector<SkinDraw> replacement;
+    replacement.reserve(model.packets.size());
+    std::array<float, 3> lower{}, upper{};
+    bool have_position = false;
+    try {
+        for (const auto& packet : model.packets) {
+            if (packet.vertex_count == 0 || packet.vertex_stride == 0 ||
+                packet.vertices.size() != std::size_t(packet.vertex_count) * packet.vertex_stride ||
+                packet.indices.empty() || packet.indices.size() % 3 || packet.palette.empty() ||
+                packet.palette.size() > 32) throw std::runtime_error("Invalid skinned packet data");
+            const assets::SkinAttribute *position = nullptr, *bone_ids = nullptr, *weight = nullptr,
+                *normal = nullptr, *uv = nullptr;
+            for (const auto& attribute : packet.attributes) {
+                if (attribute.semantic == 16 && attribute.format == 2) position = &attribute;
+                if (attribute.semantic == 18 && attribute.format == 2) normal = &attribute;
+                if (attribute.semantic == 22 && attribute.format == 1) uv = &attribute;
+                if (attribute.semantic == 32 && attribute.format == 0) weight = &attribute;
+                if (attribute.semantic == 33 && attribute.format == 11) bone_ids = &attribute;
+            }
+            if (!position || !normal || !uv || !bone_ids)
+                throw std::runtime_error("Skinned packet lacks renderer attributes");
+            for (const auto bone : packet.palette)
+                if (bone >= model.bones.size()) throw std::runtime_error("Packet palette exceeds skeleton");
+            for (const auto index : packet.indices)
+                if (index >= packet.vertex_count) throw std::runtime_error("Packet index exceeds vertices");
+            if (weight) {
+                for (std::size_t i = 0; i < packet.vertex_count; ++i) {
+                    const auto* value = reinterpret_cast<const float*>(packet.vertices.data() +
+                        i * packet.vertex_stride + weight->offset);
+                    if (!std::isfinite(*value) || *value < 0.f || *value > 1.f)
+                        throw std::runtime_error("Skinned blend weight is outside 0..1");
+                }
+            }
+            for (std::size_t i = 0; i < packet.vertex_count; ++i) {
+                const auto* ids = packet.vertices.data() + i * packet.vertex_stride + bone_ids->offset;
+                const std::size_t used = weight ? 2 : 1;
+                for (std::size_t j = 0; j < used; ++j)
+                    if (ids[j] >= packet.palette.size())
+                        throw std::runtime_error("Vertex bone index exceeds packet palette");
+            }
+            for (std::size_t i = 0; i < packet.vertex_count; ++i) {
+                const auto* value = reinterpret_cast<const float*>(packet.vertices.data() +
+                    i * packet.vertex_stride + position->offset);
+                for (int c = 0; c < 3; ++c) {
+                    if (!std::isfinite(value[c]) || std::abs(value[c]) > 1'000'000.f)
+                        throw std::runtime_error("Invalid skinned vertex position");
+                    if (!have_position) lower[c] = upper[c] = value[c];
+                    else { lower[c] = std::min(lower[c], value[c]); upper[c] = std::max(upper[c], value[c]); }
+                }
+                have_position = true;
+            }
+            SkinDraw draw;
+            draw.palette = packet.palette;
+            draw.index_count = static_cast<GLsizei>(packet.indices.size());
+            draw.has_weight = weight != nullptr;
+            glGenVertexArrays(1, &draw.array);
+            glBindVertexArray(draw.array);
+            glGenBuffers(1, &draw.vertices);
+            glBindBuffer(GL_ARRAY_BUFFER, draw.vertices);
+            glBufferData(GL_ARRAY_BUFFER, packet.vertices.size(), packet.vertices.data(), GL_STATIC_DRAW);
+            glGenBuffers(1, &draw.indices);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, draw.indices);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, packet.indices.size() * sizeof(std::uint16_t),
+                         packet.indices.data(), GL_STATIC_DRAW);
+            const auto pointer = [](std::uint8_t offset) { return reinterpret_cast<const void*>(std::uintptr_t(offset)); };
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, packet.vertex_stride, pointer(position->offset));
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, packet.vertex_stride, pointer(uv->offset));
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, packet.vertex_stride, pointer(normal->offset));
+            glEnableVertexAttribArray(2);
+            glVertexAttribIPointer(3, 4, GL_UNSIGNED_BYTE, packet.vertex_stride, pointer(bone_ids->offset));
+            glEnableVertexAttribArray(3);
+            if (weight) {
+                glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, packet.vertex_stride, pointer(weight->offset));
+                glEnableVertexAttribArray(4);
+            } else {
+                glDisableVertexAttribArray(4);
+                glVertexAttrib1f(4, 1.f);
+            }
+            replacement.push_back(draw);
+            if (glGetError() != GL_NO_ERROR) throw std::runtime_error("OpenGL rejected skinned packet upload");
+        }
+    } catch (const std::exception& e) {
+        for (const auto& draw : replacement) {
+            if (draw.array) glDeleteVertexArrays(1, &draw.array);
+            if (draw.vertices) glDeleteBuffers(1, &draw.vertices);
+            if (draw.indices) glDeleteBuffers(1, &draw.indices);
+        }
+        error = e.what();
+        return false;
+    }
+    for (const auto& draw : skin_draws_) {
+        if (draw.array) glDeleteVertexArrays(1, &draw.array);
+        if (draw.vertices) glDeleteBuffers(1, &draw.vertices);
+        if (draw.indices) glDeleteBuffers(1, &draw.indices);
+    }
+    skin_draws_ = std::move(replacement);
+    centre_ = {(lower[0]+upper[0])*.5f, (lower[1]+upper[1])*.5f, (lower[2]+upper[2])*.5f};
+    double radius = 0;
+    for (const auto& packet : model.packets) {
+        const auto position = std::find_if(packet.attributes.begin(), packet.attributes.end(),
+            [](const auto& a) { return a.semantic == 16 && a.format == 2; });
+        for (std::size_t i = 0; i < packet.vertex_count; ++i) {
+            const auto* value = reinterpret_cast<const float*>(packet.vertices.data() +
+                i * packet.vertex_stride + position->offset);
+            radius = std::max(radius, std::hypot(double(value[0]-centre_[0]),
+                double(value[1]-centre_[1]), double(value[2]-centre_[2])));
+        }
+    }
+    if (!(radius > 1e-6)) {
+        error = "Skinned model has negligible bounds";
+        return false;
+    }
+    scale_ = 1.f / static_cast<float>(radius);
+    mesh_ = true;
+    vertex_count_ = 0;
+    index_count_ = 0;
     return true;
 }
 
@@ -183,6 +332,12 @@ bool Cube::set_mesh(const assets::Mesh& mesh, std::string& error, bool dynamic) 
     glDeleteVertexArrays(1, &array_);
     glDeleteBuffers(1, &vertices_);
     glDeleteBuffers(1, &indices_);
+    for (const auto& draw : skin_draws_) {
+        if (draw.array) glDeleteVertexArrays(1, &draw.array);
+        if (draw.vertices) glDeleteBuffers(1, &draw.vertices);
+        if (draw.indices) glDeleteBuffers(1, &draw.indices);
+    }
+    skin_draws_.clear();
     array_ = array; vertices_ = vertices; indices_ = indices;
     centre_ = mesh.centre;
     scale_ = 1.0f / mesh.radius;
@@ -263,12 +418,41 @@ void Cube::draw(int width, int height, int colour, float angle, const camera::Vi
     glUniform3fv(tint_, 1, tint);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture_);
-    glBindVertexArray(array_);
-    glDrawElements(GL_TRIANGLES, index_count_, GL_UNSIGNED_SHORT, nullptr);
+    if (!skin_draws_.empty()) {
+        constexpr std::array<float, 32 * 16> identity = [] {
+            std::array<float, 32 * 16> matrices{};
+            for (std::size_t m = 0; m < 32; ++m)
+                for (std::size_t i = 0; i < 4; ++i) matrices[m * 16 + i * 5] = 1.f;
+            return matrices;
+        }();
+        glUniform1i(skinned_, GL_TRUE);
+        // The game model's original winding comes from D3D draw packets. Keep
+        // both sides visible until the Android front-face convention is verified.
+        glDisable(GL_CULL_FACE);
+        for (const auto& packet : skin_draws_) {
+            glUniform1i(has_weight_, packet.has_weight ? GL_TRUE : GL_FALSE);
+            glUniformMatrix4fv(skin_palette_, static_cast<GLsizei>(packet.palette.size()), GL_FALSE,
+                               identity.data());
+            glBindVertexArray(packet.array);
+            glDrawElements(GL_TRIANGLES, packet.index_count, GL_UNSIGNED_SHORT, nullptr);
+        }
+        glEnable(GL_CULL_FACE);
+        glUniform1i(skinned_, GL_FALSE);
+    } else {
+        glUniform1i(skinned_, GL_FALSE);
+        glBindVertexArray(array_);
+        glDrawElements(GL_TRIANGLES, index_count_, GL_UNSIGNED_SHORT, nullptr);
+    }
     glBindVertexArray(0);
 }
 
 void Cube::destroy() {
+    for (const auto& draw : skin_draws_) {
+        if (draw.array) glDeleteVertexArrays(1, &draw.array);
+        if (draw.vertices) glDeleteBuffers(1, &draw.vertices);
+        if (draw.indices) glDeleteBuffers(1, &draw.indices);
+    }
+    skin_draws_.clear();
     if (vertices_) glDeleteBuffers(1, &vertices_);
     if (array_) glDeleteVertexArrays(1, &array_);
     if (program_) glDeleteProgram(program_);

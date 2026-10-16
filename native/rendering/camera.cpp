@@ -25,11 +25,14 @@ cube_data::Matrix View::transform(float angle, float aspect, float radius) const
     finite(yaw); finite(pitch); finite(zoom); finite(aspect); finite(radius);
     if (aspect < .1f || aspect > 10 || radius <= 0 || radius > 2 || zoom < .5f || zoom > 3)
         throw std::invalid_argument("Camera bounds/aspect/zoom outside supported range");
-    const float distance = std::max(4.5f * zoom, 2.1f * radius) * std::max(1.f, 1/aspect);
+    constexpr float focal = 1.73205080757f;
+    const float horizontal_focal = focal / aspect;
+    const float sphere_fit = radius * std::sqrt(horizontal_focal * horizontal_focal + 1.f);
+    const float distance = std::max({4.5f * zoom, 2.1f * radius, sphere_fit});
     const cube_data::Matrix translation{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,-distance,1};
     // Inverse orbit: camera yaw then pitch around the centred scene.
     const auto orbit = cube_data::multiply(cube_data::rotation(0, -pitch), cube_data::rotation(-yaw, 0));
-    constexpr float near = .1f, focal = 1.73205080757f;
+    constexpr float near = .1f;
     const float far = distance + radius + 10;
     const cube_data::Matrix projection{focal/aspect,0,0,0, 0,focal,0,0,
         0,0,(far+near)/(near-far),-1, 0,0,2*far*near/(near-far),0};

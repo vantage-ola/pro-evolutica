@@ -41,6 +41,15 @@ Bytes fixture(unsigned w = 4, unsigned h = 4, unsigned mips = 1) {
     }
     return b;
 }
+Bytes dxt5_fixture() {
+    auto b = fixture();
+    b.resize(b.size() + 8);
+    std::move_backward(b.begin() + 176, b.begin() + 184, b.begin() + 192);
+    put32(b, 24, 16 + 144); put32(b, 40, 144); put32(b, 132, 0x35545844);
+    b[176] = 255; b[177] = 0;
+    b[178] = 0x88; b[179] = 0x06; // alpha selectors 0,1,2,3 on the first row
+    return b;
+}
 void changed(std::size_t offset, std::uint32_t value) {
     auto b = fixture(); put32(b, offset, value);
     reject([&] { assets::decode_bundle_texture(b, 1); });
@@ -64,6 +73,13 @@ int main() {
         require(image.width == 4 && image.height == 4 && image.rgba.size() == 64);
         require(Bytes(image.rgba.begin(), image.rgba.begin() + 16) ==
                 Bytes({255,0,0,255, 0,0,0,255, 170,0,0,255, 85,0,0,255}));
+        image = assets::decode_bundle_texture(dxt5_fixture(), 1);
+        require(image.rgba.size() == 64 && image.rgba[3] == 255 && image.rgba[7] == 0 &&
+                image.rgba[11] == 218 && image.rgba[15] == 182);
+        auto dxt5 = dxt5_fixture();
+        dxt5[176] = 0; dxt5[177] = 255; dxt5[178] = 0xbe; // selectors 6, 7, 2
+        image = assets::decode_bundle_texture(dxt5, 1);
+        require(image.rgba[3] == 0 && image.rgba[7] == 255 && image.rgba[11] == 51);
         // Deliberately exercise rounding: 16 and 8 interpolate to 13 and 11.
         put32(b, 176, 0x08001000);
         image = assets::decode_bundle_texture(b, 1);

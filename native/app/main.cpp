@@ -274,6 +274,56 @@ bool load_animation(App& app) {
     return false;
 }
 
+bool load_skinned_model(App& app) {
+    const char* directory = SDL_GetAndroidInternalStoragePath();
+    if (!directory) return false;
+    const std::string path = std::string(directory) + "/player.ktmdl";
+    std::ifstream input(path, std::ios::binary);
+    if (!input) {
+        if (errno != ENOENT) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Player model: cannot open %s", path.c_str());
+        return false;
+    }
+    try {
+        const auto read_begin = SDL_GetTicksNS();
+        std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(input)), {});
+        const auto model = assets::decode_skinned_ktmdl(bytes);
+        const auto upload_begin = SDL_GetTicksNS();
+        std::string error;
+        if (!app.cube.set_skinned_model(model, error)) throw std::runtime_error(error);
+        assets::Image image{1, 1, {255, 255, 255, 255}};
+        try {
+            image = assets::load_png(std::string(directory) + "/player.png");
+            SDL_Log("Player texture loaded: %ux%u RGBA8", image.width, image.height);
+        } catch (const std::system_error& texture_error) {
+            if (texture_error.code().value() != ENOENT) throw;
+            SDL_Log("Player texture: no player.png; using white fallback");
+        }
+        if (!app.cube.set_texture(image, error)) throw std::runtime_error(error);
+        app.mesh_read_ms = double(upload_begin - read_begin) / 1e6;
+        app.mesh_upload_ms = double(SDL_GetTicksNS() - upload_begin) / 1e6;
+        app.mesh_loaded = true;
+        app.mesh_vertices = 0;
+        app.mesh_triangles = 0;
+        for (std::size_t i = 0; i < model.packets.size(); ++i) {
+            const auto& packet = model.packets[i];
+            app.mesh_vertices += packet.vertex_count;
+            app.mesh_triangles += packet.indices.size() / 3;
+            for (const auto& texture : packet.textures)
+                SDL_Log("Player texture reference: packet=%zu; id=%016llx:%016llx; binding=%u; mode=%u; UV=%u",
+                    i, static_cast<unsigned long long>(texture.id_hi),
+                    static_cast<unsigned long long>(texture.id_lo), texture.binding_index,
+                    texture.mode, texture.uv_channel);
+        }
+        app.angle = 0;
+        SDL_Log("Skinned player loaded: %zu bones; %zu packet vertices; %zu triangles; bind pose (no PES animation yet)",
+            model.bones.size(), app.mesh_vertices, app.mesh_triangles);
+        return true;
+    } catch (const std::exception& error) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Player model: %s; trying other scene", error.what());
+        return false;
+    }
+}
+
 void load_mesh(App& app) {
     const char* directory = SDL_GetAndroidInternalStoragePath();
     if (!directory) {
@@ -469,7 +519,7 @@ bool create(App& app) {
         SDL_SetError("%s", error.c_str());
         return false;
     }
-    if (!load_animation(app)) {
+    if (!load_animation(app) && !load_skinned_model(app)) {
         if (!app.running) return false;
         load_mesh(app);
         load_texture(app);

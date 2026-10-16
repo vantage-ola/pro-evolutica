@@ -36,6 +36,10 @@ void framing() {
     view.reset(); view.orbit(0,1);
     const auto top = project(view.transform(0,1,1),0,1,0);
     check(top[1] > 0 && top[3] > 4.5f,"Pitch does not orbit around centre");
+    view.reset();
+    const auto portrait = project(view.transform(0,.5f,1),1,0,0);
+    check(portrait[0]/portrait[3] > .65f && portrait[0]/portrait[3] < 1.f,
+          "Portrait camera should fill more of the narrow screen without clipping");
     for (float aspect : {.1f,.25f,.5f,1.f,2.f,4.f,10.f})
         for (float zoom : {.5f,1.f,3.f})
             for (int step=0; step<36; ++step)
