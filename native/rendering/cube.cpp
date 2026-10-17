@@ -470,6 +470,8 @@ void Cube::draw_skinned_instances(int width, int height, float angle,
     glUniformMatrix4fv(transform_, 1, GL_FALSE, transform.data());
     const auto rotation = cube_data::rotation(angle);
     glUniformMatrix4fv(rotation_, 1, GL_FALSE, rotation.data());
+    constexpr float white_tint[] = {1.f, 1.f, 1.f};
+    glUniform3fv(tint_, 1, white_tint);
     glUniform1i(mesh_mode_, GL_TRUE);
     glUniform1i(skinned_, GL_TRUE);
     glActiveTexture(GL_TEXTURE0);
