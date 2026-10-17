@@ -86,12 +86,39 @@ void original_kick_launch_fields() {
           gameplay::kick_power_adjustment(127) == 512,
           "Guarded PES attribute adjustment or its 0..99 cap changed");
 }
+
+void captured_vertical_position_steps() {
+    // These integer velocities are derived from the captured Y deltas and the
+    // 2560-unit state scale. The dumps do not expose the temporary velocity
+    // field itself, so this verifies the recovered equation against the
+    // observed output grid without claiming a full landing/bounce match.
+    struct Case {
+        float before_y;
+        std::int32_t vertical_velocity;
+        float after_y;
+    };
+    constexpr Case cases[] = {
+        {-32.41796875f, 1131, -28.0f},
+        {-52.37109375f, 1303, -47.28125f},
+        {-348.109375f, 1001, -344.19921875f},
+    };
+    for (const auto& test : cases) {
+        gameplay::BallFlightState ball;
+        ball.y = test.before_y;
+        ball.vertical_velocity = test.vertical_velocity;
+        ball.state = 1;
+        gameplay::step_ball_flight_vertical_position(ball, {10});
+        check(ball.y == test.after_y && ball.state == 1,
+              "Recovered airborne Y step missed a captured position delta");
+    }
+}
 }  // namespace
 
 int main() {
     try {
         captured_state1_steps();
         original_kick_launch_fields();
+        captured_vertical_position_steps();
         std::cout << checks << " PES ball checks passed across three runtime snapshots and kick setup cases\n";
         return 0;
     } catch (const std::exception& error) {

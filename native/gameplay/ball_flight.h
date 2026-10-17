@@ -41,4 +41,10 @@ void launch_ball(BallFlightState& ball, std::uint16_t heading,
 
 void step_ball_flight_horizontal(BallFlightState& ball, BallFlightTick tick);
 
+// Applies only the pre-contact vertical position equation from
+// FUN_00e1e3e0's state-1 branch. The temporary-state velocity is measured in
+// 1/2560 world-unit increments per tick. Landing, bounce, and vertical-speed
+// changes are separate branches and remain unimplemented.
+void step_ball_flight_vertical_position(BallFlightState& ball, BallFlightTick tick);
+
 }  // namespace gameplay

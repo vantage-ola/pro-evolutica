@@ -130,4 +130,11 @@ void step_ball_flight_horizontal(BallFlightState& ball, BallFlightTick tick) {
     ball.z = add_internal_displacement(ball.z, dz);
 }
 
+void step_ball_flight_vertical_position(BallFlightState& ball, BallFlightTick tick) {
+    constexpr double kVerticalPositionScale = 2560.0;
+    const double scaled_position = static_cast<double>(ball.y) * kVerticalPositionScale;
+    const double vertical_delta = static_cast<double>(tick.delta) * ball.vertical_velocity;
+    ball.y = static_cast<float>((scaled_position + vertical_delta) / kVerticalPositionScale);
+}
+
 }  // namespace gameplay
