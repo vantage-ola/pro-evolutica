@@ -321,11 +321,8 @@ bool load_skinned_model(App& app) {
             for (const auto& matrix : first.bones)
                 for (const auto value : matrix)
                     if (!std::isfinite(value)) throw std::runtime_error("player.pose has non-finite matrix data");
-            skinning::Instance second = first;
-            first.transform[12] = -.52f;
-            second.transform[12] = .52f;
-            app.skinned_instances = {std::move(first), std::move(second)};
-            SDL_Log("Captured player pose loaded: %u skeleton bones; trace call=%u; drawing two shared-mesh instances",
+            app.skinned_instances = {std::move(first)};
+            SDL_Log("Captured player pose loaded: %u skeleton bones; trace call=%u; drawing one inspection instance",
                     read_u32(8), read_u32(12));
         }
         app.mesh_read_ms = double(upload_begin - read_begin) / 1e6;
