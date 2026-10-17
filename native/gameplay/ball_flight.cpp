@@ -148,6 +148,14 @@ void step_ball_ground_motion(BallFlightState& ball, BallFlightTick tick,
     const std::int32_t dz = displacement(ball.angle, movement_speed, tick.delta);
     ball.x = add_internal_displacement(ball.x, dx);
     ball.z = add_internal_displacement(ball.z, dz);
+    if (movement_speed > 0x800) {
+        const std::int32_t divisor = movement_speed / 0x800 + 2;
+        const double phase = static_cast<double>(ball.x) + ball.z +
+            ball.angle + movement_speed;
+        const auto phase_integer = static_cast<std::int32_t>(phase);
+        const auto remainder = phase_integer % divisor;
+        ball.y = static_cast<float>(-0x1c - std::abs(remainder));
+    }
     ball.spin = 0;
     ball.speed = final_speed;
 }

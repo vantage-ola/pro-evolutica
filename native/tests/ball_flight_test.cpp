@@ -127,13 +127,13 @@ void captured_ground_motion_steps() {
     constexpr Case cases[] = {
         {{-7991.890625f, -28.0f, -1799.857421875f, 14820, 511, 7569, 0,
           0, 5062, 2},
-         7215, -7987.6484375f, -28.0f, -1827.923828125f, 14818, 6879},
+         7215, -7987.6484375f, -29.0f, -1827.923828125f, 14818, 6879},
         {{-12308.62109375f, -28.0f, -674.1015625f, 40038, 540, 7000, 1,
           0, 4680, 2},
          6674, -12328.75f, -28.0f, -657.25f, 40039, 6360},
         {{17425.46875f, -28.0f, 2384.40234375f, 61332, 576, 6971, 0,
           0, 4660, 2},
-         6646, 17449.515625f, -28.0f, 2394.640625f, 61335, 6333},
+         6646, 17449.515625f, -31.0f, 2394.640625f, 61335, 6333},
     };
     for (const auto& test : cases) {
         auto ball = test.input;
@@ -144,7 +144,7 @@ void captured_ground_motion_steps() {
               std::abs(ball.z - test.expected_z) < 0.0001f,
               "PES ground step missed a captured horizontal position");
         check(ball.y == test.expected_y && ball.speed == test.final_speed && ball.spin == 0,
-              "Ground step must preserve unresolved Y while applying captured speed/spin");
+              "Ground step must match the captured Y bob, speed, and spin fields");
     }
 }
 }  // namespace

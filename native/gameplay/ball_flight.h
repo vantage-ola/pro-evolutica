@@ -41,10 +41,11 @@ void launch_ball(BallFlightState& ball, std::uint16_t heading,
 
 void step_ball_flight_horizontal(BallFlightState& ball, BallFlightTick tick);
 
-// Applies the verified state-2 heading, curve, and horizontal-position update.
-// PES's final damped speed calculation still depends on an unresolved input,
-// so the caller must supply the speed observed/recovered for this tick. The
-// state-2 vertical-position change is deliberately left untouched.
+// Applies the verified state-2 heading, curve, and position update. For the
+// captured rolling range above 0x800, this includes PES's Y bob derived from
+// the updated X/Z, heading, and intermediate movement speed. PES's final
+// damped speed calculation still depends on an unresolved input, so the
+// caller must supply the speed observed/recovered for this tick.
 void step_ball_ground_motion(BallFlightState& ball, BallFlightTick tick,
                              std::int32_t final_speed);
 
