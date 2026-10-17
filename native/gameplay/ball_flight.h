@@ -15,6 +15,9 @@ struct BallFlightState {
     std::uint16_t spin = 0;
     std::int32_t speed = 0;
     std::uint8_t direction_flags = 0;
+    std::int32_t vertical_velocity = 0;
+    std::int32_t curve = 0;
+    std::uint8_t state = 1;
 };
 
 // Applies one state-1 PES ball update's angle and horizontal displacement.
@@ -24,6 +27,17 @@ struct BallFlightState {
 struct BallFlightTick {
     std::int32_t delta = 10;
 };
+
+// Convert the byte-sized attribute read by PES's conditional kick-power path
+// into its additive speed adjustment. The caller must apply this only when
+// the original player-state guard is true.
+std::int32_t kick_power_adjustment(std::uint8_t attribute);
+
+// Mirrors the launch-field writes in FUN_00e20190/FUN_00e1fdb0. The optional
+// adjustment is the already-resolved result of the guarded player path.
+void launch_ball(BallFlightState& ball, std::uint16_t heading,
+                 std::int32_t requested_power, std::int32_t vertical_parameter,
+                 std::int32_t guarded_power_adjustment = 0);
 
 void step_ball_flight_horizontal(BallFlightState& ball, BallFlightTick tick);
 

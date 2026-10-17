@@ -43,12 +43,56 @@ void captured_state1_steps() {
               "Horizontal step must leave vertical/contact and speed state untouched");
     }
 }
+
+void original_kick_launch_fields() {
+    gameplay::BallFlightState ground_ball;
+    ground_ball.y = -28.0f;
+    ground_ball.spin = 123;
+    gameplay::launch_ball(ground_ball, 0x1234, 12001, 0);
+    check(ground_ball.angle == 0x1234 && ground_ball.speed == 12001,
+          "PES launch must copy heading and requested speed");
+    check(ground_ball.curve == 3000 && ground_ball.spin == 0,
+          "PES kick wrapper must derive curve from power and clear spin");
+    check(ground_ball.vertical_velocity == 0 && ground_ball.state == 2,
+          "A powered ground kick with no vertical impulse must enter rolling state");
+
+    gameplay::BallFlightState lofted_ball;
+    lofted_ball.y = -28.0f;
+    gameplay::launch_ball(lofted_ball, 0xffff, 9000, 8);
+    check(lofted_ball.vertical_velocity == -8 * 0xbc && lofted_ball.state == 1,
+          "PES vertical launch parameter must scale by -0xbc and enter flight state");
+
+    gameplay::BallFlightState airborne_ball;
+    airborne_ball.y = -52.0f;
+    gameplay::launch_ball(airborne_ball, 7, 0, 0);
+    check(airborne_ball.state == 1,
+          "A stationary ball above the launch height threshold must remain airborne");
+
+    gameplay::BallFlightState stopped_ball;
+    stopped_ball.y = -28.0f;
+    gameplay::launch_ball(stopped_ball, 7, 0, 0);
+    check(stopped_ball.state == 0,
+          "A zero-speed ground launch must enter the stopped state");
+
+    gameplay::BallFlightState capped_ball;
+    capped_ball.y = -28.0f;
+    gameplay::launch_ball(capped_ball, 0, 42000, 0, 0);
+    check(capped_ball.speed == 0x9fff,
+          "PES launch speed above its 135-percent threshold must clamp to 0x9fff");
+
+    check(gameplay::kick_power_adjustment(0) == 3553 &&
+          gameplay::kick_power_adjustment(49) == 2048 &&
+          gameplay::kick_power_adjustment(99) == 512 &&
+          gameplay::kick_power_adjustment(127) == 512,
+          "Guarded PES attribute adjustment or its 0..99 cap changed");
+}
 }  // namespace
 
 int main() {
     try {
         captured_state1_steps();
-        std::cout << checks << " original ball-flight checks passed across three runtime snapshots\n";
+        original_kick_launch_fields();
+        std::cout << checks << " PES ball checks passed across three runtime snapshots and kick setup cases\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

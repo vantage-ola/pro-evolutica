@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 namespace gameplay {
 namespace {
@@ -65,7 +66,45 @@ float add_internal_displacement(float position, std::int32_t delta) {
     const double scaled = static_cast<double>(position) * kPositionScale + delta;
     return static_cast<float>(scaled / kPositionScale);
 }
+
+std::int32_t clamp_i32(std::int64_t value) {
+    return static_cast<std::int32_t>(std::clamp<std::int64_t>(
+        value, std::numeric_limits<std::int32_t>::min(),
+        std::numeric_limits<std::int32_t>::max()));
+}
 }  // namespace
+
+std::int32_t kick_power_adjustment(std::uint8_t attribute) {
+    const auto capped = std::min<std::int32_t>(attribute & 0x7f, 99);
+    const double value = (1.0 - (static_cast<double>(capped - 49) / 50.0)) * 1536.0 + 512.0;
+    return static_cast<std::int32_t>(value);  // Ghidra's FISTP path truncates toward zero.
+}
+
+void launch_ball(BallFlightState& ball, std::uint16_t heading,
+                 std::int32_t requested_power, std::int32_t vertical_parameter,
+                 std::int32_t guarded_power_adjustment) {
+    const auto magnitude = requested_power < 0
+        ? -static_cast<std::int64_t>(requested_power)
+        : static_cast<std::int64_t>(requested_power);
+    // FUN_00e20190 derives the initial curve field from the signed request,
+    // while FUN_00e1fdb0 receives its absolute speed (plus a guarded bonus).
+    ball.curve = requested_power / 4;
+    ball.spin = 0;
+    auto speed = magnitude + guarded_power_adjustment;
+    if (speed < 0) speed = 0;
+    if (speed * 100 / 0x7684 > 0x87) speed = 0x9fff;
+    ball.speed = clamp_i32(speed);
+    ball.angle = heading;
+    ball.vertical_velocity = clamp_i32(-static_cast<std::int64_t>(vertical_parameter) * 0xbc);
+
+    if (ball.vertical_velocity != 0 || ball.y < -36.0f) {
+        ball.state = 1;
+    } else if (ball.speed != 0 || ball.y <= -36.0f) {
+        ball.state = 2;
+    } else {
+        ball.state = 0;
+    }
+}
 
 void step_ball_flight_horizontal(BallFlightState& ball, BallFlightTick tick) {
     const std::int32_t direction = (ball.direction_flags & 0x0f) != 0 ? 1 : -1;
