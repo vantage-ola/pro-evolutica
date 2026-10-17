@@ -13,31 +13,34 @@ void check(bool condition, const char* message) {
 }
 
 void captured_state1_steps() {
-    // Each incoming speed is the best-fit integer from the captured X/Z delta;
-    // none of the three dumps stores the previous speed in the history ring.
+    // Consecutive rows from the game's own 224-record trajectory cache. The
+    // inputs include the captured speed, spin, flags, and heading, so no value
+    // is fitted from the output position.
     struct Case {
         gameplay::BallFlightState input;
         float expected_x;
         float expected_z;
         std::uint16_t expected_angle;
-        float x_tolerance;
     };
     constexpr Case cases[] = {
-        {{-8166.50390625f, -32.41796875f, 1476.345703125f, 16826, 191, 18292, 0},
-         -8169.3984375f, 1404.962890625f, 16815, 0.04f},
-        {{-9855.8359375f, -52.37109375f, -2294.54296875f, 38034, 156, 16352, 1},
-         -9911.6796875f, -2263.58984375f, 38047, 0.001f},
-        {{10619.6484375f, -348.109375f, 447.3046875f, 63266, 192, 25916, 0},
-         10718.45703125f, 469.2265625f, 63258, 0.001f},
+        {{-8169.5703125f, -31.64453125f, 1339.849609375f,
+          16414, 191, 16566, 0, -779, 1334, 1},
+         -8169.6953125f, 1275.158203125f, 16406},
+        {{-9967.1484375f, -41.60546875f, -2232.78125f,
+          38057, 156, 16153, 1, 1598, 1345, 1},
+         -10022.265625f, -2202.12890625f, 38063},
+        {{10816.77734375f, -339.80078125f, 491.1171875f,
+          63250, 192, 25671, 0, 1251, -2414, 1},
+         10914.62890625f, 512.953125f, 63244},
     };
     for (const auto& test : cases) {
         auto ball = test.input;
         gameplay::step_ball_flight_horizontal(ball, {10});
         check(ball.angle == test.expected_angle,
               "PES spin and position jitter changed the wrong heading");
-        check(std::abs(ball.x - test.expected_x) < test.x_tolerance,
+        check(std::abs(ball.x - test.expected_x) < 0.0001f,
               "Recovered flight step missed a captured lateral position");
-        check(std::abs(ball.z - test.expected_z) < 0.004f,
+        check(std::abs(ball.z - test.expected_z) < 0.0001f,
               "Recovered flight step missed a captured forward position");
         check(ball.y == test.input.y && ball.speed == test.input.speed,
               "Horizontal step must leave vertical/contact and speed state untouched");
@@ -88,19 +91,17 @@ void original_kick_launch_fields() {
 }
 
 void captured_vertical_position_steps() {
-    // These integer velocities are derived from the captured Y deltas and the
-    // 2560-unit state scale. The dumps do not expose the temporary velocity
-    // field itself, so this verifies the recovered equation against the
-    // observed output grid without claiming a full landing/bounce match.
+    // These use the recorded incoming vertical-speed field and consecutive
+    // output rows from the same three trajectory caches as the horizontal test.
     struct Case {
         float before_y;
         std::int32_t vertical_velocity;
         float after_y;
     };
     constexpr Case cases[] = {
-        {-32.41796875f, 1131, -28.0f},
-        {-52.37109375f, 1303, -47.28125f},
-        {-348.109375f, 1001, -344.19921875f},
+        {-31.64453125f, -779, -34.6875f},
+        {-41.60546875f, 1598, -35.36328125f},
+        {-339.80078125f, 1251, -334.9140625f},
     };
     for (const auto& test : cases) {
         gameplay::BallFlightState ball;
