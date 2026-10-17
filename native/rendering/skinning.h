@@ -12,6 +12,7 @@ struct Instance {
     std::vector<Matrix> bones; // One skin matrix per skeleton bone.
     Matrix transform = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     // World placement after centering/scaling the pose.
+    std::size_t model_index = 0; // Selects a shared uploaded mesh/model set.
 };
 
 // Converts the three float4 rows written by PES to the GLES matrix layout used

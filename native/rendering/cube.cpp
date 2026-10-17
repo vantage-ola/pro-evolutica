@@ -168,6 +168,18 @@ bool Cube::create(std::string& error) {
 }
 
 bool Cube::set_skinned_model(const assets::SkinnedModel& model, std::string& error) {
+    for (const auto& set : skin_models_) {
+        for (const auto& draw : set.draws) {
+            if (draw.array) glDeleteVertexArrays(1, &draw.array);
+            if (draw.vertices) glDeleteBuffers(1, &draw.vertices);
+            if (draw.indices) glDeleteBuffers(1, &draw.indices);
+        }
+    }
+    skin_models_.clear();
+    return add_skinned_model(model, error);
+}
+
+bool Cube::add_skinned_model(const assets::SkinnedModel& model, std::string& error) {
     if (model.bones.empty() || model.bones.size() > 32 || model.packets.empty()) {
         error = "Skinned model exceeds renderer bone/packet limits";
         return false;
@@ -270,13 +282,9 @@ bool Cube::set_skinned_model(const assets::SkinnedModel& model, std::string& err
         error = e.what();
         return false;
     }
-    for (const auto& draw : skin_draws_) {
-        if (draw.array) glDeleteVertexArrays(1, &draw.array);
-        if (draw.vertices) glDeleteBuffers(1, &draw.vertices);
-        if (draw.indices) glDeleteBuffers(1, &draw.indices);
-    }
-    skin_draws_ = std::move(replacement);
-    skin_model_ = model;
+    SkinModel addition;
+    addition.model = model;
+    addition.draws = std::move(replacement);
     centre_ = {(lower[0]+upper[0])*.5f, (lower[1]+upper[1])*.5f, (lower[2]+upper[2])*.5f};
     double radius = 0;
     for (const auto& packet : model.packets) {
@@ -294,6 +302,7 @@ bool Cube::set_skinned_model(const assets::SkinnedModel& model, std::string& err
         return false;
     }
     scale_ = 1.f / static_cast<float>(radius);
+    skin_models_.push_back(std::move(addition));
     mesh_ = true;
     vertex_count_ = 0;
     index_count_ = 0;
@@ -347,12 +356,14 @@ bool Cube::set_mesh(const assets::Mesh& mesh, std::string& error, bool dynamic) 
     glDeleteVertexArrays(1, &array_);
     glDeleteBuffers(1, &vertices_);
     glDeleteBuffers(1, &indices_);
-    for (const auto& draw : skin_draws_) {
-        if (draw.array) glDeleteVertexArrays(1, &draw.array);
-        if (draw.vertices) glDeleteBuffers(1, &draw.vertices);
-        if (draw.indices) glDeleteBuffers(1, &draw.indices);
+    for (const auto& set : skin_models_) {
+        for (const auto& draw : set.draws) {
+            if (draw.array) glDeleteVertexArrays(1, &draw.array);
+            if (draw.vertices) glDeleteBuffers(1, &draw.vertices);
+            if (draw.indices) glDeleteBuffers(1, &draw.indices);
+        }
     }
-    skin_draws_.clear();
+    skin_models_.clear();
     array_ = array; vertices_ = vertices; indices_ = indices;
     centre_ = mesh.centre;
     scale_ = 1.0f / mesh.radius;
@@ -435,7 +446,7 @@ void Cube::draw(int width, int height, int colour, float angle, const camera::Vi
     glUniform3fv(tint_, 1, tint);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture_);
-    if (!skin_draws_.empty()) {
+    if (!skin_models_.empty()) {
         constexpr std::array<float, 32 * 16> identity_palette = [] {
             std::array<float, 32 * 16> matrices{};
             for (std::size_t m = 0; m < 32; ++m)
@@ -446,7 +457,7 @@ void Cube::draw(int width, int height, int colour, float angle, const camera::Vi
         // The game model's original winding comes from D3D draw packets. Keep
         // both sides visible until the Android front-face convention is verified.
         glDisable(GL_CULL_FACE);
-        for (const auto& packet : skin_draws_) {
+        for (const auto& packet : skin_models_.front().draws) {
             glUniform1i(weight_count_, packet.weight_count);
             glUniformMatrix4fv(skin_palette_, static_cast<GLsizei>(packet.palette.size()), GL_FALSE,
                                identity_palette.data());
@@ -466,7 +477,7 @@ void Cube::draw(int width, int height, int colour, float angle, const camera::Vi
 void Cube::draw_skinned_instances(int width, int height, float angle,
                                   const camera::View& view,
                                   const std::vector<skinning::Instance>& instances) {
-    if (width <= 0 || height <= 0 || skin_draws_.empty() || instances.empty()) return;
+    if (width <= 0 || height <= 0 || skin_models_.empty() || instances.empty()) return;
     glViewport(0, 0, width, height);
     glClearColor(0.035f, 0.05f, 0.075f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -488,13 +499,19 @@ void Cube::draw_skinned_instances(int width, int height, float angle,
     glBindTexture(GL_TEXTURE_2D, texture_);
     glDisable(GL_CULL_FACE);
     for (const auto& instance : instances) {
-        const auto fit = skinning::bounds(skin_model_, instance.bones);
+        if (instance.model_index >= skin_models_.size()) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Skin instance selects missing model %zu",
+                         instance.model_index);
+            continue;
+        }
+        const auto& set = skin_models_[instance.model_index];
+        const auto fit = skinning::bounds(set.model, instance.bones);
         glUniform3f(centre_uniform_, fit.centre.x, fit.centre.y, fit.centre.z);
         glUniform1f(scale_uniform_, 1.f / fit.radius);
         glUniformMatrix4fv(instance_transform_, 1, GL_FALSE, instance.transform.data());
-        for (std::size_t i = 0; i < skin_draws_.size(); ++i) {
-            const auto& packet = skin_draws_[i];
-            const auto& source = skin_model_.packets[i];
+        for (std::size_t i = 0; i < set.draws.size(); ++i) {
+            const auto& packet = set.draws[i];
+            const auto& source = set.model.packets[i];
             std::array<skinning::Matrix, 32> local{};
             for (std::size_t slot = 0; slot < source.palette.size(); ++slot) {
                 const auto bone = source.palette[slot];
@@ -518,12 +535,14 @@ void Cube::draw_skinned_instances(int width, int height, float angle,
 }
 
 void Cube::destroy() {
-    for (const auto& draw : skin_draws_) {
-        if (draw.array) glDeleteVertexArrays(1, &draw.array);
-        if (draw.vertices) glDeleteBuffers(1, &draw.vertices);
-        if (draw.indices) glDeleteBuffers(1, &draw.indices);
+    for (const auto& set : skin_models_) {
+        for (const auto& draw : set.draws) {
+            if (draw.array) glDeleteVertexArrays(1, &draw.array);
+            if (draw.vertices) glDeleteBuffers(1, &draw.vertices);
+            if (draw.indices) glDeleteBuffers(1, &draw.indices);
+        }
     }
-    skin_draws_.clear();
+    skin_models_.clear();
     if (vertices_) glDeleteBuffers(1, &vertices_);
     if (array_) glDeleteVertexArrays(1, &array_);
     if (program_) glDeleteProgram(program_);

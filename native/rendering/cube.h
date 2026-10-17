@@ -17,6 +17,7 @@ public:
     bool set_texture(const assets::Image& image, std::string& error);
     bool set_mesh(const assets::Mesh& mesh, std::string& error, bool dynamic = false);
     bool set_skinned_model(const assets::SkinnedModel& model, std::string& error);
+    bool add_skinned_model(const assets::SkinnedModel& model, std::string& error);
     bool update_vertices(const std::vector<assets::MeshVertex>& vertices, std::string& error);
     void draw(int width, int height, int colour, float angle, const camera::View& view);
     void draw_skinned_instances(int width, int height, float angle, const camera::View& view,
@@ -46,9 +47,12 @@ private:
         std::vector<std::uint16_t> palette;
         GLint weight_count = 0;
     };
-    std::vector<SkinDraw> skin_draws_;
+    struct SkinModel {
+        assets::SkinnedModel model;
+        std::vector<SkinDraw> draws;
+    };
+    std::vector<SkinModel> skin_models_;
     GLint skinned_ = -1;
     GLint skin_palette_ = -1, weight_count_ = -1;
     GLint instance_transform_ = -1;
-    assets::SkinnedModel skin_model_;
 };

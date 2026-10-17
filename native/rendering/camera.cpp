@@ -23,7 +23,10 @@ void View::reset() { yaw = pitch = 0; zoom = 1; }
 
 cube_data::Matrix View::transform(float angle, float aspect, float radius) const {
     finite(yaw); finite(pitch); finite(zoom); finite(aspect); finite(radius);
-    if (aspect < .1f || aspect > 10 || radius <= 0 || radius > 2 || zoom < .5f || zoom > 3)
+    // Match-sized scenes can have a larger bounding radius than the single
+    // inspection model. Keep a generous upper bound to reject invalid inputs
+    // without aborting when several captured actors are framed together.
+    if (aspect < .1f || aspect > 10 || radius <= 0 || radius > 10 || zoom < .5f || zoom > 3)
         throw std::invalid_argument("Camera bounds/aspect/zoom outside supported range");
     constexpr float focal = 1.73205080757f;
     const float horizontal_focal = focal / aspect;

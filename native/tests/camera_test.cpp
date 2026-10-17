@@ -91,7 +91,8 @@ void bounds_and_sticks() {
         rejects([&]{camera::gamepad(view,0,0,0,bad);});
     }
     for (float aspect : {0.f,-1.f,.09f,11.f}) rejects([&]{view.transform(0,aspect,1);});
-    for (float radius : {0.f,-1.f,3.f}) rejects([&]{view.transform(0,1,radius);});
+    check(std::isfinite(view.transform(0, 1, 3)[0]), "Match-sized camera radius rejected");
+    for (float radius : {0.f,-1.f,11.f}) rejects([&]{view.transform(0,1,radius);});
     rejects([&]{camera::gamepad(view,0,0,0,-.1f);});
     rejects([&]{camera::gamepad(view,0,0,0,.2f);});
 }

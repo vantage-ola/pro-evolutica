@@ -293,6 +293,16 @@ bool load_skinned_model(App& app) {
         const auto upload_begin = SDL_GetTicksNS();
         std::string error;
         if (!app.cube.set_skinned_model(model, error)) throw std::runtime_error(error);
+        bool has_alternate_model = false;
+        {
+            std::ifstream alternate_input(std::string(directory) + "/player-alt.ktmdl", std::ios::binary);
+            if (alternate_input) {
+                std::vector<std::uint8_t> alternate_bytes((std::istreambuf_iterator<char>(alternate_input)), {});
+                const auto alternate = assets::decode_skinned_ktmdl(alternate_bytes);
+                if (!app.cube.add_skinned_model(alternate, error)) throw std::runtime_error(error);
+                has_alternate_model = true;
+            }
+        }
         assets::Image image{1, 1, {255, 255, 255, 255}};
         try {
             image = assets::load_png(std::string(directory) + "/player.png");
@@ -302,28 +312,97 @@ bool load_skinned_model(App& app) {
             SDL_Log("Player texture: no player.png; using white fallback");
         }
         if (!app.cube.set_texture(image, error)) throw std::runtime_error(error);
-        const std::string pose_path = std::string(directory) + "/player.pose";
-        std::ifstream pose_input(pose_path, std::ios::binary);
-        if (pose_input) {
+        const auto read_pose = [&model](const std::string& path, bool required,
+                                        std::uint32_t& trace_call) {
+            std::ifstream pose_input(path, std::ios::binary);
+            if (!pose_input) {
+                if (required) throw std::runtime_error("Cannot open required player pose: " + path);
+                return std::vector<skinning::Matrix>{};
+            }
             std::vector<std::uint8_t> pose((std::istreambuf_iterator<char>(pose_input)), {});
             if (pose.size() != 16 + model.bones.size() * 16 * sizeof(float) ||
                 std::memcmp(pose.data(), "PESPOSE1", 8))
-                throw std::runtime_error("player.pose header/size does not match player.ktmdl");
+                throw std::runtime_error("Player pose header/size does not match player.ktmdl");
             const auto read_u32 = [&pose](std::size_t offset) {
                 return std::uint32_t(pose[offset]) | (std::uint32_t(pose[offset+1]) << 8) |
                     (std::uint32_t(pose[offset+2]) << 16) | (std::uint32_t(pose[offset+3]) << 24);
             };
             if (read_u32(8) != model.bones.size())
-                throw std::runtime_error("player.pose skeleton count differs from player.ktmdl");
+                throw std::runtime_error("Player pose skeleton count differs from player.ktmdl");
+            trace_call = read_u32(12);
             skinning::Instance first;
             first.bones.resize(model.bones.size());
             std::memcpy(first.bones.data(), pose.data() + 16, first.bones.size() * sizeof(skinning::Matrix));
             for (const auto& matrix : first.bones)
                 for (const auto value : matrix)
-                    if (!std::isfinite(value)) throw std::runtime_error("player.pose has non-finite matrix data");
-            app.skinned_instances = {std::move(first)};
-            SDL_Log("Captured player pose loaded: %u skeleton bones; trace call=%u; drawing one inspection instance",
-                    read_u32(8), read_u32(12));
+                    if (!std::isfinite(value)) throw std::runtime_error("Player pose has non-finite matrix data");
+            return first.bones;
+        };
+        const auto field_path = std::string(directory) + "/player-field.pes";
+        std::ifstream field_input(field_path, std::ios::binary);
+        if (field_input) {
+            std::vector<std::uint8_t> field((std::istreambuf_iterator<char>(field_input)), {});
+            const auto read_u32 = [&field](std::size_t offset) {
+                if (offset + 4 > field.size()) throw std::runtime_error("Truncated player-field package");
+                return std::uint32_t(field[offset]) | (std::uint32_t(field[offset+1]) << 8) |
+                    (std::uint32_t(field[offset+2]) << 16) | (std::uint32_t(field[offset+3]) << 24);
+            };
+            if (field.size() < 12 || std::memcmp(field.data(), "PESFLD01", 8) || !has_alternate_model)
+                throw std::runtime_error("Player-field header or alternate model is missing");
+            const auto count = read_u32(8);
+            constexpr std::size_t record_size = 16 + 3 * sizeof(float) + 19 * 16 * sizeof(float);
+            if (count == 0 || count > 22 || field.size() != 12 + count * record_size)
+                throw std::runtime_error("Player-field actor count or size is invalid");
+            app.skinned_instances.clear();
+            app.skinned_instances.reserve(count);
+            std::size_t cursor = 12;
+            for (std::uint32_t i = 0; i < count; ++i) {
+                const auto model_index = read_u32(cursor);
+                const auto trace_call = read_u32(cursor + 4);
+                const auto bone_count = read_u32(cursor + 8);
+                if (model_index > 1 || bone_count != 19)
+                    throw std::runtime_error("Player-field model index or skeleton size is invalid");
+                const std::size_t position_offset = cursor + 16;
+                skinning::Instance instance;
+                instance.model_index = model_index;
+                instance.bones.resize(bone_count);
+                const auto* position = reinterpret_cast<const float*>(field.data() + position_offset);
+                for (int axis = 0; axis < 3; ++axis) {
+                    if (!std::isfinite(position[axis])) throw std::runtime_error("Player-field position is not finite");
+                    instance.transform[12 + axis] = position[axis];
+                }
+                constexpr float instance_scale = 0.08f;
+                instance.transform[0] = instance.transform[5] = instance.transform[10] = instance_scale;
+                const std::size_t matrices_offset = position_offset + 3 * sizeof(float);
+                std::memcpy(instance.bones.data(), field.data() + matrices_offset,
+                            instance.bones.size() * sizeof(skinning::Matrix));
+                for (const auto& matrix : instance.bones)
+                    for (const auto value : matrix)
+                        if (!std::isfinite(value)) throw std::runtime_error("Player-field pose is not finite");
+                app.skinned_instances.push_back(std::move(instance));
+                SDL_Log("Match draw loaded: actor=%u model=%u trace-call=%u", i, model_index, trace_call);
+                cursor += record_size;
+            }
+            SDL_Log("Captured match field loaded: %u instances across two model variants", count);
+        }
+        std::uint32_t first_call = 0, second_call = 0;
+        const auto first_pose = app.skinned_instances.empty()
+            ? read_pose(std::string(directory) + "/player.pose", false, first_call)
+            : std::vector<skinning::Matrix>{};
+        if (!first_pose.empty()) {
+            auto second_pose = read_pose(std::string(directory) + "/player2.pose", false, second_call);
+            if (second_pose.empty()) {
+                second_pose = first_pose;
+                second_call = first_call;
+            }
+            skinning::Instance first, second;
+            first.bones = first_pose;
+            second.bones = std::move(second_pose);
+            first.transform[12] = -1.05f;
+            second.transform[12] = 1.05f;
+            app.skinned_instances = {std::move(first), std::move(second)};
+            SDL_Log("Captured player poses loaded: trace calls=%u,%u; skeleton bones=%zu; drawing two instances",
+                    first_call, second_call, model.bones.size());
         }
         app.mesh_read_ms = double(upload_begin - read_begin) / 1e6;
         app.mesh_upload_ms = double(SDL_GetTicksNS() - upload_begin) / 1e6;
