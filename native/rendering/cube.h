@@ -44,11 +44,11 @@ private:
         GLuint array = 0, vertices = 0, indices = 0;
         GLsizei index_count = 0;
         std::vector<std::uint16_t> palette;
-        bool has_weight = false;
+        GLint weight_count = 0;
     };
     std::vector<SkinDraw> skin_draws_;
     GLint skinned_ = -1;
-    GLint skin_palette_ = -1, has_weight_ = -1;
+    GLint skin_palette_ = -1, weight_count_ = -1;
     GLint instance_transform_ = -1;
     assets::SkinnedModel skin_model_;
 };

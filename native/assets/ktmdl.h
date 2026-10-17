@@ -46,6 +46,7 @@ struct SkinnedModel {
 // Throws on malformed/unsupported input; never executes model data.
 StaticModel decode_static_ktmdl(const std::vector<std::uint8_t>& bytes);
 // Bounded KTMDL 2.2 skinned triangle-list packets with one vertex/index stream.
-// Retains vertex bytes and packet palettes for the Android skinning renderer.
+// Retains vertex bytes and packet palettes for the Android skinning renderer,
+// including float1..float3 weights and UBYTE4 bone indices.
 SkinnedModel decode_skinned_ktmdl(const std::vector<std::uint8_t>& bytes);
 } // namespace assets

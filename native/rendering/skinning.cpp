@@ -55,26 +55,39 @@ Vec3 deform_position(const assets::SkinPacket& packet, std::size_t vertex,
     const auto* position = find(packet, 16);
     const auto* bone_ids = find(packet, 33);
     const auto* weight = find(packet, 32);
-    if (!position || position->format != 2 || !bone_ids || bone_ids->format != 11)
+    if (!position || position->format != 2 || !bone_ids || bone_ids->format != 11 ||
+        (weight && weight->format > 2))
         throw std::runtime_error("Packet lacks supported skin attributes");
     const auto* source = packet.vertices.data() + vertex * packet.vertex_stride;
     const auto* p = source + position->offset;
     const Vec3 point{read_float(p), read_float(p + 4), read_float(p + 8)};
     const auto* ids = source + bone_ids->offset;
-    if (ids[0] >= packet.palette.size() || ids[1] >= packet.palette.size())
-        throw std::runtime_error("Vertex references an absent packet palette slot");
-    const auto first_bone = packet.palette[ids[0]], second_bone = packet.palette[ids[1]];
-    if (first_bone >= bones.size() || second_bone >= bones.size())
-        throw std::runtime_error("Skin matrix missing for referenced packet bone");
-    const auto first = apply(bones[first_bone], point);
-    if (!weight) return first;
-    if (weight->format != 0) throw std::runtime_error("Unsupported skin weight format");
-    const float amount = read_float(source + weight->offset);
-    if (amount < 0.f || amount > 1.f) throw std::runtime_error("Skin weight outside 0..1");
-    const auto second = apply(bones[second_bone], point);
-    return {first.x * (1.f - amount) + second.x * amount,
-            first.y * (1.f - amount) + second.y * amount,
-            first.z * (1.f - amount) + second.z * amount};
+    const std::size_t explicit_count = weight ? std::size_t(weight->format) + 1 : 0;
+    float explicit_weights[3]{};
+    float residual = 1.f;
+    for (std::size_t i = 0; i < explicit_count; ++i) {
+        explicit_weights[i] = read_float(source + weight->offset + i * sizeof(float));
+        if (explicit_weights[i] < 0.f || explicit_weights[i] > 1.f)
+            throw std::runtime_error("Skin weight outside 0..1");
+        residual -= explicit_weights[i];
+    }
+    if (residual < -1e-5f) throw std::runtime_error("Skin weights sum above 1");
+    residual = std::max(0.f, residual);
+    Vec3 result{};
+    for (std::size_t i = 0; i <= explicit_count; ++i) {
+        const float amount = i == 0 ? residual : explicit_weights[i - 1];
+        if (amount == 0.f) continue;
+        const auto slot = ids[i];
+        if (slot >= packet.palette.size())
+            throw std::runtime_error("Vertex references an absent packet palette slot");
+        const auto bone = packet.palette[slot];
+        if (bone >= bones.size()) throw std::runtime_error("Skin matrix missing for referenced packet bone");
+        const auto transformed = apply(bones[bone], point);
+        result.x += transformed.x * amount;
+        result.y += transformed.y * amount;
+        result.z += transformed.z * amount;
+    }
+    return result;
 }
 
 Bounds bounds(const assets::SkinnedModel& model, const std::vector<Matrix>& bones) {

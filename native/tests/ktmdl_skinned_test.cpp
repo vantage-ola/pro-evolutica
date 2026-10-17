@@ -98,6 +98,19 @@ void skinning_checks() {
     const auto deformed=skinning::deform_position(packet,0,bones);
     require(std::abs(deformed.x-18.5f)<1e-6f && deformed.y==0 && deformed.z==0,
             "PES blend weight must weight palette index 1");
+
+    assets::SkinPacket four;
+    four.vertex_count=1; four.vertex_stride=28; four.palette={0,1,2,3};
+    four.vertices.resize(28);
+    number(four.vertices,0,1.f); number(four.vertices,4,0.f); number(four.vertices,8,0.f);
+    number(four.vertices,12,.1f); number(four.vertices,16,.2f); number(four.vertices,20,.3f);
+    four.vertices[24]=0; four.vertices[25]=1; four.vertices[26]=2; four.vertices[27]=3;
+    four.attributes={{0,0,2,16},{0,12,2,32},{0,24,11,33}};
+    const std::vector<std::array<float,16>> four_bones={
+        translated(0),translated(10),translated(20),translated(30)};
+    const auto four_deformed=skinning::deform_position(four,0,four_bones);
+    require(std::abs(four_deformed.x-15.f)<1e-6f,
+            "Three explicit weights must blend four influences with residual on palette slot zero");
 }
 } // namespace
 
