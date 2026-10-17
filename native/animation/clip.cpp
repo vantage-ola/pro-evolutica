@@ -48,6 +48,44 @@ bool changed(const struct stat& a,const struct stat& b) {
 double distance(const Vec3& v,const std::array<float,3>& c) {
     return std::hypot(v[0]-c[0],v[1]-c[1],v[2]-c[2]);
 }
+Quaternion interpolate(const Quaternion& a,const Quaternion& source_b,double amount) {
+    Quaternion b=source_b;
+    double dot=0;
+    for (std::size_t i=0;i<4;++i) dot+=a[i]*b[i];
+    if (dot<0) { dot=-dot; for (double& x:b) x=-x; }
+    dot=std::clamp(dot,-1.0,1.0);
+    Quaternion out{};
+    if (dot>0.9995) {
+        double length2=0;
+        for (std::size_t i=0;i<4;++i) { out[i]=a[i]+amount*(b[i]-a[i]); length2+=out[i]*out[i]; }
+        const double inverse=1/std::sqrt(length2);
+        for (double& x:out) x*=inverse;
+        return out;
+    }
+    const double angle=std::acos(dot), sine=std::sin(angle);
+    const double wa=std::sin((1-amount)*angle)/sine, wb=std::sin(amount*angle)/sine;
+    for (std::size_t i=0;i<4;++i) out[i]=wa*a[i]+wb*b[i];
+    return out;
+}
+assets::Mesh make_mesh(const std::vector<Vec3>& xyz,const std::vector<std::uint16_t>& indices,
+                       const std::array<float,3>& centre,float radius) {
+    std::vector<Vec3> normals(xyz.size());
+    for (std::size_t i=0;i<indices.size();i+=3) {
+        const auto a=indices[i],b=indices[i+1],c=indices[i+2];
+        Vec3 u{},v{};
+        for (std::size_t k=0;k<3;++k) { u[k]=xyz[b][k]-xyz[a][k]; v[k]=xyz[c][k]-xyz[a][k]; }
+        const Vec3 n{u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]};
+        for (const auto node:{a,b,c}) for (std::size_t k=0;k<3;++k) normals[node][k]+=n[k];
+    }
+    assets::Mesh mesh{{},indices,centre,radius};
+    mesh.vertices.reserve(xyz.size());
+    for (std::size_t i=0;i<xyz.size();++i) {
+        const auto length=std::hypot(normals[i][0],normals[i][1],normals[i][2]);
+        const auto n=length>1e-12 ? Vec3{normals[i][0]/length,normals[i][1]/length,normals[i][2]/length} : Vec3{0,1,0};
+        mesh.vertices.push_back({float(xyz[i][0]),float(xyz[i][1]),float(xyz[i][2]),0,0,float(n[0]),float(n[1]),float(n[2])});
+    }
+    return mesh;
+}
 }
 
 Clip decode_clip(const std::vector<std::uint8_t>& bytes) {
@@ -133,30 +171,42 @@ Clip load_clip(const std::string& path) {
     return decode_clip(bytes);
 }
 
+std::vector<LocalPose> Clip::pose_at(double seconds) const {
+    if (!std::isfinite(seconds)) fail("Invalid animation time");
+    const double last=static_cast<double>(samples.size()-1);
+    const double frame=std::clamp(seconds*fps,0.0,last);
+    const auto left=static_cast<std::size_t>(frame);
+    const auto right=std::min(left+1,samples.size()-1);
+    const double amount=frame-left;
+    std::vector<LocalPose> pose(samples[left].size());
+    for (std::size_t bone=0;bone<pose.size();++bone) {
+        const auto& a=samples[left][bone];
+        const auto& b=samples[right][bone];
+        pose[bone].rotation=interpolate(a.rotation,b.rotation,amount);
+        if (a.translation || b.translation) {
+            const auto& rest=skeleton.rest_local_translation(bone);
+            const auto& ta=a.translation ? *a.translation : rest;
+            const auto& tb=b.translation ? *b.translation : rest;
+            pose[bone].translation=Vec3{
+                ta[0]+(tb[0]-ta[0])*amount,
+                ta[1]+(tb[1]-ta[1])*amount,
+                ta[2]+(tb[2]-ta[2])*amount};
+        }
+    }
+    return pose;
+}
+
+std::vector<Vec3> Clip::positions_at(double seconds) const {
+    return skin_positions(vertices,skeleton.evaluate(pose_at(seconds)));
+}
+
 std::vector<Vec3> Clip::positions(std::size_t sample) const {
     if (sample>=samples.size()) fail("Animation sample out of range");
     return skin_positions(vertices,skeleton.evaluate(samples[sample]));
 }
 
-assets::Mesh Clip::mesh(std::size_t sample) const {
-    const auto xyz=positions(sample);
-    std::vector<Vec3> normals(xyz.size());
-    for (std::size_t i=0;i<indices.size();i+=3) {
-        const auto a=indices[i],b=indices[i+1],c=indices[i+2];
-        Vec3 u{},v{};
-        for (std::size_t k=0;k<3;++k) { u[k]=xyz[b][k]-xyz[a][k]; v[k]=xyz[c][k]-xyz[a][k]; }
-        const Vec3 n{u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]};
-        for (const auto node:{a,b,c}) for (std::size_t k=0;k<3;++k) normals[node][k]+=n[k];
-    }
-    assets::Mesh mesh{{},indices,centre,radius};
-    mesh.vertices.reserve(xyz.size());
-    for (std::size_t i=0;i<xyz.size();++i) {
-        const auto length=std::hypot(normals[i][0],normals[i][1],normals[i][2]);
-        const auto n=length>1e-12 ? Vec3{normals[i][0]/length,normals[i][1]/length,normals[i][2]/length} : Vec3{0,1,0};
-        mesh.vertices.push_back({float(xyz[i][0]),float(xyz[i][1]),float(xyz[i][2]),0,0,float(n[0]),float(n[1]),float(n[2])});
-    }
-    return mesh;
-}
+assets::Mesh Clip::mesh_at(double seconds) const { return make_mesh(positions_at(seconds),indices,centre,radius); }
+assets::Mesh Clip::mesh(std::size_t sample) const { return make_mesh(positions(sample),indices,centre,radius); }
 
 Playback::Playback(std::size_t samples,std::uint32_t fps):samples_(samples),fps_(fps) {
     if (!samples || samples>512 || !fps || fps>240) fail("Invalid playback counts");

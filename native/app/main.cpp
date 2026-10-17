@@ -33,6 +33,7 @@ struct App {
     std::unique_ptr<animation::Clip> clip;
     std::unique_ptr<animation::Playback> playback;
     std::size_t uploaded_sample = 0;
+    std::uint64_t uploaded_elapsed_ns = 0;
     camera::View view;
     camera::Touch touch;
     diagnostics::Capture capture;
@@ -714,12 +715,13 @@ int main(int, char**) {
         }
         const float elapsed = std::min(.1f, float(delta) / 1'000'000'000.0f);
         gamepad_camera(app,elapsed);
-        if (app.clip && app.uploaded_sample!=app.playback->sample()) {
+        if (app.clip && app.uploaded_elapsed_ns!=app.playback->elapsed_ns()) {
             try {
-                const auto mesh=app.clip->mesh(app.playback->sample());
+                const auto mesh=app.clip->mesh_at(app.playback->seconds());
                 std::string error;
                 if (!app.cube.update_vertices(mesh.vertices,error)) throw std::runtime_error(error);
                 app.uploaded_sample=app.playback->sample();
+                app.uploaded_elapsed_ns=app.playback->elapsed_ns();
             } catch (const std::exception& e) {
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Animation frame: %s",e.what());
                 result=1;

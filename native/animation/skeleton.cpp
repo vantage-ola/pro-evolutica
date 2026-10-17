@@ -102,6 +102,10 @@ Skeleton::Skeleton(std::vector<Bone> bones) : bones_(std::move(bones)) {
     }
 }
 
+const Vec3& Skeleton::rest_local_translation(std::size_t bone) const {
+    return rest_translation_.at(bone);
+}
+
 Pose Skeleton::evaluate(const std::vector<LocalPose>& local) const {
     if (local.size() != bones_.size()) fail("Pose must contain every bone");
     Pose out;

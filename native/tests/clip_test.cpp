@@ -57,6 +57,19 @@ void package() {
     bad=bytes;bad[44+132+16+6]=240;bad[44+132+16+7]=127;
     refused([&] { animation::decode_clip(bad); }); // Non-finite weight.
 }
+void interpolation() {
+    const auto clip=animation::decode_clip(fixture());
+    const auto middle=clip.pose_at(.5/30.0);
+    check(middle.size()==1 && middle[0].translation.has_value());
+    check(std::abs((*middle[0].translation)[0]-.5)<1e-9);
+    double norm=0;for(double component:middle[0].rotation)norm+=component*component;
+    check(std::abs(norm-1)<1e-9);
+    const auto mesh=clip.mesh_at(.5/30.0);
+    check(std::abs(mesh.vertices[0].x-.5)<1e-5 && std::abs(mesh.vertices[1].x-1.5)<1e-5);
+    check(std::abs((*clip.pose_at(-1)[0].translation)[0])<1e-9);
+    check(std::abs((*clip.pose_at(10)[0].translation)[0]-2)<1e-9);
+    refused([&] { clip.pose_at(std::numeric_limits<double>::quiet_NaN()); });
+}
 void timing() {
     animation::Playback p(91,30);
     p.advance(33'333'333);check(p.sample()==0);
@@ -80,6 +93,6 @@ void files() {
 }
 }
 int main() {
-    try { package();timing();files();std::cout<<"clip: package, timing and regular-file checks passed\n";return 0; }
+    try { package();interpolation();timing();files();std::cout<<"clip: package, interpolation, timing and regular-file checks passed\n";return 0; }
     catch (const std::exception& e) { std::cerr<<e.what()<<'\n';return 1; }
 }

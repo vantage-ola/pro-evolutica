@@ -14,7 +14,10 @@ struct Clip {
     std::uint32_t fps;
     std::array<float,3> centre;
     float radius;
+    std::vector<LocalPose> pose_at(double seconds) const;
+    std::vector<Vec3> positions_at(double seconds) const;
     std::vector<Vec3> positions(std::size_t sample) const;
+    assets::Mesh mesh_at(double seconds) const;
     assets::Mesh mesh(std::size_t sample) const;
 };
 Clip decode_clip(const std::vector<std::uint8_t>& bytes);
@@ -27,6 +30,8 @@ public:
     void advance(std::uint64_t elapsed_ns);
     void rewind() { elapsed_ = 0; }
     std::size_t sample() const;
+    std::uint64_t elapsed_ns() const { return elapsed_; }
+    double seconds() const { return static_cast<double>(elapsed_)/1'000'000'000.0; }
     bool ended() const { return sample() == samples_-1; }
 private:
     std::size_t samples_;

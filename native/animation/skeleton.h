@@ -39,6 +39,7 @@ class Skeleton {
 public:
     explicit Skeleton(std::vector<Bone> bones);
     Pose evaluate(const std::vector<LocalPose>& local) const;
+    const Vec3& rest_local_translation(std::size_t bone) const;
 private:
     std::vector<Bone> bones_;
     std::vector<Vec3> rest_translation_;
