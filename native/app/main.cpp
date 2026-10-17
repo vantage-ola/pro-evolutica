@@ -381,6 +381,19 @@ bool load_skinned_model(App& app) {
             app.captured_field_frames.clear();
             app.captured_field_frames.reserve(frame_count);
             app.captured_field_frame_ns = std::uint64_t(frame_interval_us) * 1'000;
+            const assets::Image white_fallback{1, 1, {255, 255, 255, 255}};
+            for (std::uint32_t texture_index = 0; texture_index < actor_count; ++texture_index) {
+                char filename[40]{};
+                std::snprintf(filename, sizeof(filename), "/player-field-tex-%02u.png", texture_index);
+                assets::Image field_texture = white_fallback;
+                try {
+                    field_texture = assets::load_png(std::string(directory) + filename);
+                } catch (const std::system_error& texture_error) {
+                    if (texture_error.code().value() != ENOENT) throw;
+                }
+                if (!app.cube.add_instance_texture(field_texture, error)) throw std::runtime_error(error);
+            }
+            SDL_Log("Captured player textures loaded: %u per-actor 128x128 images", actor_count);
             std::size_t cursor = 20;
             for (std::uint32_t frame_index = 0; frame_index < frame_count; ++frame_index) {
                 std::vector<skinning::Instance> frame_instances;
@@ -389,11 +402,13 @@ bool load_skinned_model(App& app) {
                     const auto model_index = read_u32(cursor);
                     const auto trace_call = read_u32(cursor + 4);
                     const auto bone_count = read_u32(cursor + 8);
-                    if (model_index > 1 || bone_count != 19)
-                        throw std::runtime_error("Player-field model index or skeleton size is invalid");
+                    const auto texture_index = read_u32(cursor + 12);
+                    if (model_index > 1 || bone_count != 19 || texture_index >= actor_count)
+                        throw std::runtime_error("Player-field model, texture index or skeleton size is invalid");
                     const std::size_t position_offset = cursor + 16;
                     skinning::Instance instance;
                     instance.model_index = model_index;
+                    instance.texture_index = texture_index;
                     instance.bones.resize(bone_count);
                     std::array<float, 3> position{};
                     std::memcpy(position.data(), field.data() + position_offset, sizeof(position));

@@ -40,6 +40,11 @@ void framing() {
     const auto portrait = project(view.transform(0,.5f,1),1,0,0);
     check(portrait[0]/portrait[3] > .65f && portrait[0]/portrait[3] < 1.f,
           "Portrait camera should fill more of the narrow screen without clipping");
+    const auto field_default = project(view.transform(0,.5f,4),1,0,0);
+    view.dolly(std::log(.5f)); // Same direction as a two-finger pinch-out gesture.
+    const auto field_zoomed = project(view.transform(0,.5f,4),1,0,0);
+    check(field_zoomed[0]/field_zoomed[3] > field_default[0]/field_default[3],
+          "Zoom-in must move closer for a match-sized scene");
     for (float aspect : {.1f,.25f,.5f,1.f,2.f,4.f,10.f})
         for (float zoom : {.5f,1.f,3.f})
             for (int step=0; step<36; ++step)
@@ -49,9 +54,12 @@ void framing() {
                     for (const auto& v : cube_data::vertices) {
                         const auto p = project(matrix,v.x,v.y,v.z);
                         bool inside = p[3] > 0;
-                        for (int axis=0; axis<3; ++axis)
-                            inside &= std::isfinite(p[axis]) && std::abs(p[axis]/p[3]) < 1;
-                        check(inside,"Cube clipped at supported camera bounds");
+                        for (int axis=0; axis<3; ++axis) inside &= std::isfinite(p[axis]/p[3]);
+                        check(inside,"Cube projection invalid at supported camera bounds");
+                        if (zoom >= 1) {
+                            for (int axis=0; axis<3; ++axis) inside &= std::abs(p[axis]/p[3]) < 1;
+                            check(inside,"Cube clipped while zoomed out or at default framing");
+                        }
                     }
                     const auto ball = view.transform(step*.13f,aspect,1);
                     // Sample a sphere rather than a cube to exercise the mesh's radius.
@@ -59,9 +67,12 @@ void framing() {
                         const float a = i*.2617993878f;
                         const auto p = project(ball,std::cos(a),std::sin(a),0);
                         bool inside = p[3] > 0;
-                        for (int axis=0; axis<3; ++axis)
-                            inside &= std::isfinite(p[axis]) && std::abs(p[axis]/p[3]) < 1;
-                        check(inside,"Mesh clipped at supported camera bounds");
+                        for (int axis=0; axis<3; ++axis) inside &= std::isfinite(p[axis]/p[3]);
+                        check(inside,"Mesh projection invalid at supported camera bounds");
+                        if (zoom >= 1) {
+                            for (int axis=0; axis<3; ++axis) inside &= std::abs(p[axis]/p[3]) < 1;
+                            check(inside,"Mesh clipped while zoomed out or at default framing");
+                        }
                     }
                 }
 }

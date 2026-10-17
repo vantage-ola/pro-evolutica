@@ -13,6 +13,7 @@ struct Instance {
     Matrix transform = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     // World placement after centering/scaling the pose.
     std::size_t model_index = 0; // Selects a shared uploaded mesh/model set.
+    std::size_t texture_index = 0; // Selects a per-instance material image when supplied.
 };
 
 // Converts the three float4 rows written by PES to the GLES matrix layout used

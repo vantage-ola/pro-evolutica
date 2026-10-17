@@ -15,6 +15,7 @@ class Cube {
 public:
     bool create(std::string& error);
     bool set_texture(const assets::Image& image, std::string& error);
+    bool add_instance_texture(const assets::Image& image, std::string& error);
     bool set_mesh(const assets::Mesh& mesh, std::string& error, bool dynamic = false);
     bool set_skinned_model(const assets::SkinnedModel& model, std::string& error);
     bool add_skinned_model(const assets::SkinnedModel& model, std::string& error);
@@ -30,6 +31,7 @@ private:
     GLuint array_ = 0;
     GLuint indices_ = 0;
     GLuint texture_ = 0;
+    std::vector<GLuint> instance_textures_;
     GLint transform_ = -1;
     GLint tint_ = -1;
     GLint rotation_ = -1;

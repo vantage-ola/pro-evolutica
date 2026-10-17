@@ -80,6 +80,39 @@ GLuint compile(GLenum type, const char* source, std::string& error) {
     }
     return shader;
 }
+
+GLuint upload_texture(const assets::Image& image, std::string& error) {
+    GLint maximum = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum);
+    if (maximum <= 0 || !image.width || !image.height || image.width > assets::max_image_dimension ||
+        image.height > assets::max_image_dimension ||
+        std::uint64_t(image.width) * image.height > assets::max_image_pixels ||
+        image.width > static_cast<std::uint32_t>(maximum) ||
+        image.height > static_cast<std::uint32_t>(maximum) ||
+        image.rgba.size() != std::size_t(image.width) * image.height * 4) {
+        error = "Texture dimensions or RGBA byte count are invalid";
+        return 0;
+    }
+    GLuint texture = 0;
+    glGenTextures(1, &texture);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.width, image.height,
+                 0, GL_RGBA, GL_UNSIGNED_BYTE, image.rgba.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    const GLenum status = glGetError();
+    if (!texture || status != GL_NO_ERROR) {
+        while (glGetError() != GL_NO_ERROR) {}
+        if (texture) glDeleteTextures(1, &texture);
+        error = "Cannot upload RGBA texture; GL=" + std::to_string(status);
+        return 0;
+    }
+    return texture;
+}
 } // namespace
 
 bool Cube::create(std::string& error) {
@@ -389,40 +422,20 @@ bool Cube::update_vertices(const std::vector<assets::MeshVertex>& vertices, std:
 }
 
 bool Cube::set_texture(const assets::Image& image, std::string& error) {
-    GLint maximum = 0;
-    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum);
-    if (maximum <= 0 || !image.width || !image.height || image.width > assets::max_image_dimension ||
-        image.height > assets::max_image_dimension ||
-        std::uint64_t(image.width) * image.height > assets::max_image_pixels ||
-        image.width > static_cast<std::uint32_t>(maximum) ||
-        image.height > static_cast<std::uint32_t>(maximum) ||
-        image.rgba.size() != std::size_t(image.width) * image.height * 4) {
-        error = "Texture dimensions or RGBA byte count are invalid";
-        return false;
-    }
-    GLuint replacement = 0;
-    glGenTextures(1, &replacement);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, replacement);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.width, image.height,
-                 0, GL_RGBA, GL_UNSIGNED_BYTE, image.rgba.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    const GLenum status = glGetError();
-    if (!replacement || status != GL_NO_ERROR) {
-        // A failed allocation can also make mipmap generation fail. Clear all
-        // upload errors so the preserved checkerboard can continue drawing.
-        while (glGetError() != GL_NO_ERROR) {}
-        if (replacement) glDeleteTextures(1, &replacement);
+    const GLuint replacement = upload_texture(image, error);
+    if (!replacement) {
         glBindTexture(GL_TEXTURE_2D, texture_);
-        error = "Cannot upload RGBA texture; GL=" + std::to_string(status);
         return false;
     }
     glDeleteTextures(1, &texture_);
     texture_ = replacement;
+    return true;
+}
+
+bool Cube::add_instance_texture(const assets::Image& image, std::string& error) {
+    const GLuint texture = upload_texture(image, error);
+    if (!texture) return false;
+    instance_textures_.push_back(texture);
     return true;
 }
 
@@ -496,7 +509,6 @@ void Cube::draw_skinned_instances(int width, int height, float angle,
     glUniform1i(mesh_mode_, GL_TRUE);
     glUniform1i(skinned_, GL_TRUE);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture_);
     glDisable(GL_CULL_FACE);
     for (const auto& instance : instances) {
         if (instance.model_index >= skin_models_.size()) {
@@ -505,6 +517,9 @@ void Cube::draw_skinned_instances(int width, int height, float angle,
             continue;
         }
         const auto& set = skin_models_[instance.model_index];
+        const GLuint instance_texture = instance.texture_index < instance_textures_.size()
+            ? instance_textures_[instance.texture_index] : texture_;
+        glBindTexture(GL_TEXTURE_2D, instance_texture);
         const auto fit = skinning::bounds(set.model, instance.bones);
         glUniform3f(centre_uniform_, fit.centre.x, fit.centre.y, fit.centre.z);
         glUniform1f(scale_uniform_, 1.f / fit.radius);
@@ -543,6 +558,10 @@ void Cube::destroy() {
         }
     }
     skin_models_.clear();
+    if (!instance_textures_.empty()) {
+        glDeleteTextures(static_cast<GLsizei>(instance_textures_.size()), instance_textures_.data());
+        instance_textures_.clear();
+    }
     if (vertices_) glDeleteBuffers(1, &vertices_);
     if (array_) glDeleteVertexArrays(1, &array_);
     if (program_) glDeleteProgram(program_);

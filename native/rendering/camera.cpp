@@ -31,7 +31,10 @@ cube_data::Matrix View::transform(float angle, float aspect, float radius) const
     constexpr float focal = 1.73205080757f;
     const float horizontal_focal = focal / aspect;
     const float sphere_fit = radius * std::sqrt(horizontal_focal * horizontal_focal + 1.f);
-    const float distance = std::max({4.5f * zoom, 2.1f * radius, sphere_fit});
+    // Fit the full scene at the default zoom, then scale that distance. Keeping
+    // the fit terms outside the zoom multiplier makes zoom ineffective for
+    // match-sized scenes because their bounds dominate the minimum distance.
+    const float distance = std::max({4.5f, 2.1f * radius, sphere_fit}) * zoom;
     const cube_data::Matrix translation{1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,-distance,1};
     // Inverse orbit: camera yaw then pitch around the centred scene.
     const auto orbit = cube_data::multiply(cube_data::rotation(0, -pitch), cube_data::rotation(-yaw, 0));
