@@ -30,6 +30,10 @@ struct App {
     SDL_Gamepad* gamepad = nullptr;
     Cube cube;
     std::vector<skinning::Instance> skinned_instances;
+    std::vector<std::vector<skinning::Instance>> captured_field_frames;
+    std::size_t captured_field_frame = 0;
+    std::uint64_t captured_field_remainder_ns = 0;
+    std::uint64_t captured_field_frame_ns = 16'666'667;
     std::unique_ptr<animation::Clip> clip;
     std::unique_ptr<animation::Playback> playback;
     std::size_t uploaded_sample = 0;
@@ -81,6 +85,18 @@ void change_colour(App& app, const char* input) {
 }
 
 void pause_rotation(App& app) {
+    if (!app.captured_field_frames.empty()) {
+        if (app.paused && app.captured_field_frame + 1 == app.captured_field_frames.size()) {
+            app.captured_field_frame = 0;
+            app.captured_field_remainder_ns = 0;
+            app.skinned_instances = app.captured_field_frames.front();
+            app.paused = false;
+        } else app.paused = !app.paused;
+        SDL_Log("Captured field %s; frame=%zu/%zu (provisional 60 Hz)",
+                app.paused ? "paused" : "playing",
+                app.captured_field_frame + 1, app.captured_field_frames.size());
+        return;
+    }
     if (app.playback && app.playback->ended()) {
         app.playback->rewind();
         app.paused = false;
@@ -98,6 +114,11 @@ void camera_log(App& app, const char* input) {
 void reset_view(App& app) {
     app.view.reset();
     app.angle = app.clip ? 0.f : .6f;
+    if (!app.captured_field_frames.empty()) {
+        app.captured_field_frame = 0;
+        app.captured_field_remainder_ns = 0;
+        app.skinned_instances = app.captured_field_frames.front();
+    }
     if (app.playback) {
         app.playback->rewind();
         SDL_Log("Animation reset; sample=0; paused");
@@ -347,43 +368,58 @@ bool load_skinned_model(App& app) {
                 return std::uint32_t(field[offset]) | (std::uint32_t(field[offset+1]) << 8) |
                     (std::uint32_t(field[offset+2]) << 16) | (std::uint32_t(field[offset+3]) << 24);
             };
-            if (field.size() < 12 || std::memcmp(field.data(), "PESFLD01", 8) || !has_alternate_model)
+            if (field.size() < 20 || std::memcmp(field.data(), "PESFLD02", 8) || !has_alternate_model)
                 throw std::runtime_error("Player-field header or alternate model is missing");
-            const auto count = read_u32(8);
+            const auto frame_count = read_u32(8);
+            const auto actor_count = read_u32(12);
+            const auto frame_interval_us = read_u32(16);
             constexpr std::size_t record_size = 16 + 3 * sizeof(float) + 19 * 16 * sizeof(float);
-            if (count == 0 || count > 22 || field.size() != 12 + count * record_size)
-                throw std::runtime_error("Player-field actor count or size is invalid");
-            app.skinned_instances.clear();
-            app.skinned_instances.reserve(count);
-            std::size_t cursor = 12;
-            for (std::uint32_t i = 0; i < count; ++i) {
-                const auto model_index = read_u32(cursor);
-                const auto trace_call = read_u32(cursor + 4);
-                const auto bone_count = read_u32(cursor + 8);
-                if (model_index > 1 || bone_count != 19)
-                    throw std::runtime_error("Player-field model index or skeleton size is invalid");
-                const std::size_t position_offset = cursor + 16;
-                skinning::Instance instance;
-                instance.model_index = model_index;
-                instance.bones.resize(bone_count);
-                const auto* position = reinterpret_cast<const float*>(field.data() + position_offset);
-                for (int axis = 0; axis < 3; ++axis) {
-                    if (!std::isfinite(position[axis])) throw std::runtime_error("Player-field position is not finite");
-                    instance.transform[12 + axis] = position[axis];
+            if (frame_count < 2 || frame_count > 600 || actor_count != 22 ||
+                frame_interval_us < 1'000 || frame_interval_us > 1'000'000 ||
+                field.size() != 20 + std::size_t(frame_count) * actor_count * record_size)
+                throw std::runtime_error("Player-field frame/actor count, interval or size is invalid");
+            app.captured_field_frames.clear();
+            app.captured_field_frames.reserve(frame_count);
+            app.captured_field_frame_ns = std::uint64_t(frame_interval_us) * 1'000;
+            std::size_t cursor = 20;
+            for (std::uint32_t frame_index = 0; frame_index < frame_count; ++frame_index) {
+                std::vector<skinning::Instance> frame_instances;
+                frame_instances.reserve(actor_count);
+                for (std::uint32_t i = 0; i < actor_count; ++i) {
+                    const auto model_index = read_u32(cursor);
+                    const auto trace_call = read_u32(cursor + 4);
+                    const auto bone_count = read_u32(cursor + 8);
+                    if (model_index > 1 || bone_count != 19)
+                        throw std::runtime_error("Player-field model index or skeleton size is invalid");
+                    const std::size_t position_offset = cursor + 16;
+                    skinning::Instance instance;
+                    instance.model_index = model_index;
+                    instance.bones.resize(bone_count);
+                    std::array<float, 3> position{};
+                    std::memcpy(position.data(), field.data() + position_offset, sizeof(position));
+                    for (int axis = 0; axis < 3; ++axis) {
+                        if (!std::isfinite(position[axis]))
+                            throw std::runtime_error("Player-field position is not finite");
+                        instance.transform[12 + axis] = position[axis];
+                    }
+                    constexpr float instance_scale = 0.08f;
+                    instance.transform[0] = instance.transform[5] = instance.transform[10] = instance_scale;
+                    const std::size_t matrices_offset = position_offset + sizeof(position);
+                    std::memcpy(instance.bones.data(), field.data() + matrices_offset,
+                                instance.bones.size() * sizeof(skinning::Matrix));
+                    for (const auto& matrix : instance.bones)
+                        for (const auto value : matrix)
+                            if (!std::isfinite(value)) throw std::runtime_error("Player-field pose is not finite");
+                    frame_instances.push_back(std::move(instance));
+                    if (frame_index == 0)
+                        SDL_Log("Match draw loaded: actor=%u model=%u trace-call=%u", i, model_index, trace_call);
+                    cursor += record_size;
                 }
-                constexpr float instance_scale = 0.08f;
-                instance.transform[0] = instance.transform[5] = instance.transform[10] = instance_scale;
-                const std::size_t matrices_offset = position_offset + 3 * sizeof(float);
-                std::memcpy(instance.bones.data(), field.data() + matrices_offset,
-                            instance.bones.size() * sizeof(skinning::Matrix));
-                for (const auto& matrix : instance.bones)
-                    for (const auto value : matrix)
-                        if (!std::isfinite(value)) throw std::runtime_error("Player-field pose is not finite");
-                app.skinned_instances.push_back(std::move(instance));
-                SDL_Log("Match draw loaded: actor=%u model=%u trace-call=%u", i, model_index, trace_call);
-                cursor += record_size;
+                app.captured_field_frames.push_back(std::move(frame_instances));
             }
-            SDL_Log("Captured match field loaded: %u instances across two model variants", count);
+            app.skinned_instances = app.captured_field_frames.front();
+            SDL_Log("Captured match field loaded: %u frames, %u instances, two model variants; timing provisional",
+                    frame_count, actor_count);
         }
         std::uint32_t first_call = 0, second_call = 0;
         const auto first_pose = app.skinned_instances.empty()
@@ -645,7 +681,8 @@ bool create(App& app) {
     SDL_Log("Benchmark: keyboard B starts 5s warmup + 60s capture; input/background/resize cancels");
     SDL_Log("Resource diagnostic: keyboard L reads files/resource-img into new files/resource-check");
     SDL_Log("Archive ball: keyboard T previews dt0b.img resource 0x0b000011 model entry 0 and colour texture entry 1");
-    SDL_Log("Controls: drag orbit; pinch zoom; hold/release reset; PS4 left stick orbit, right stick Y zoom, Triangle reset, X tint, Options %s",app.clip ? "play/pause/replay" : "rotation");
+    SDL_Log("Controls: drag orbit; pinch zoom; hold/release reset; PS4 left stick orbit, right stick Y zoom, Triangle reset, X tint, Options %s",
+            (app.clip || !app.captured_field_frames.empty()) ? "play/pause/replay" : "rotation");
     return true;
 }
 
@@ -769,6 +806,21 @@ int main(int, char**) {
             if (app.playback->ended()) {
                 app.paused=true;
                 SDL_Log("Animation ended; sample=%zu; held",app.playback->sample());
+            }
+        }
+        if (!app.captured_field_frames.empty() && !first_frame && app.active &&
+            !background_transition && !app.paused) {
+            app.captured_field_remainder_ns += delta;
+            while (app.captured_field_remainder_ns >= app.captured_field_frame_ns) {
+                app.captured_field_remainder_ns -= app.captured_field_frame_ns;
+                if (app.captured_field_frame + 1 >= app.captured_field_frames.size()) {
+                    app.paused = true;
+                    app.captured_field_remainder_ns = 0;
+                    SDL_Log("Captured field replay ended; frame=%zu; held", app.captured_field_frame + 1);
+                    break;
+                }
+                ++app.captured_field_frame;
+                app.skinned_instances = app.captured_field_frames[app.captured_field_frame];
             }
         }
         SDL_Event event;
