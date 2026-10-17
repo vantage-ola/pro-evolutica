@@ -1,4 +1,5 @@
 #include "../assets/ktmdl.h"
+#include "../rendering/skinning.h"
 
 #include <cstring>
 #include <iostream>
@@ -75,6 +76,29 @@ void rejects(const Bytes& bytes) {
     catch (const std::runtime_error&) { ++checks; return; }
     throw std::runtime_error("Malformed skinned KTMDL accepted");
 }
+std::array<float, 16> translated(float x) {
+    return {1,0,0,0, 0,1,0,0, 0,0,1,0, x,0,0,1};
+}
+void skinning_checks() {
+    const auto matrix=skinning::from_d3d_rows({0,-1,0,2, 1,0,0,3, 0,0,1,4});
+    require(matrix[0]==0 && matrix[4]==-1 && matrix[1]==1 && matrix[12]==2 &&
+            matrix[13]==3 && matrix[14]==4 && matrix[15]==1,
+            "D3D row palette was not packed for GLES column-major upload");
+
+    assets::SkinPacket packet;
+    packet.vertex_count=1; packet.vertex_stride=20; packet.palette={1,0};
+    packet.vertices.resize(20);
+    number(packet.vertices,0,1.f); number(packet.vertices,4,0.f); number(packet.vertices,8,0.f);
+    number(packet.vertices,12,.25f); packet.vertices[16]=0; packet.vertices[17]=1;
+    packet.attributes={{0,0,2,16},{0,12,0,32},{0,16,11,33}};
+    const std::vector<std::array<float,16>> bones={translated(10),translated(20)};
+    const auto local=skinning::packet_palette(packet,bones);
+    require(local[0][12]==20 && local[1][12]==10,
+            "Packet-local palette does not follow its skeleton map");
+    const auto deformed=skinning::deform_position(packet,0,bones);
+    require(std::abs(deformed.x-18.5f)<1e-6f && deformed.y==0 && deformed.z==0,
+            "PES blend weight must weight palette index 1");
+}
 } // namespace
 
 int main() {
@@ -93,6 +117,7 @@ int main() {
         require(model.packets[0].palette==std::vector<std::uint16_t>({0}) &&
                 model.packets[0].attributes.size()==5 && model.packets[1].attributes.size()==4,
                 "Packet palette/declarations changed");
+        skinning_checks();
         auto bad=fixture(); put16(bad,888,3); rejects(bad);
         bad=fixture(); put32(bad,364,0); rejects(bad); // cyclic self-parent
         bad=fixture(); bad.resize(1007); put32(bad,144,1007); rejects(bad);

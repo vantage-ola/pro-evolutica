@@ -1,5 +1,7 @@
 #include "cube.h"
 #include "cube_data.h"
+#include "skinning.h"
+#include <SDL3/SDL.h>
 
 #include <cstddef>
 #include <cmath>
@@ -12,6 +14,7 @@ layout(location = 2) in vec3 normal;
 layout(location = 3) in uvec4 bone_indices;
 layout(location = 4) in float bone_weight;
 uniform mat4 transform;
+uniform mat4 instance_transform;
 uniform mat4 rotation;
 uniform bool mesh_mode;
 uniform bool skinned;
@@ -28,15 +31,15 @@ void main() {
         vec4 first = skin_palette[bone_indices.x] * source_position;
         if (has_weight) {
             vec4 second = skin_palette[bone_indices.y] * source_position;
-            source_position = first * bone_weight + second * (1.0 - bone_weight);
-            source_normal = mat3(skin_palette[bone_indices.x]) * normal * bone_weight +
-                            mat3(skin_palette[bone_indices.y]) * normal * (1.0 - bone_weight);
+            source_position = first * (1.0 - bone_weight) + second * bone_weight;
+            source_normal = mat3(skin_palette[bone_indices.x]) * normal * (1.0 - bone_weight) +
+                            mat3(skin_palette[bone_indices.y]) * normal * bone_weight;
         } else {
             source_position = first;
             source_normal = mat3(skin_palette[bone_indices.x]) * normal;
         }
     }
-    gl_Position = transform * vec4((source_position.xyz - centre) * scale, 1.0);
+    gl_Position = transform * instance_transform * vec4((source_position.xyz - centre) * scale, 1.0);
     // The extracted mesh retains top-first source UVs; the original cube uses
     // bottom-first UVs. No image bytes are flipped or changed.
     texture_uv = mesh_mode ? uv : vec2(uv.x, 1.0 - uv.y);
@@ -110,6 +113,7 @@ bool Cube::create(std::string& error) {
     mesh_mode_ = glGetUniformLocation(program_, "mesh_mode");
     centre_uniform_ = glGetUniformLocation(program_, "centre");
     scale_uniform_ = glGetUniformLocation(program_, "scale");
+    instance_transform_ = glGetUniformLocation(program_, "instance_transform");
     skinned_ = glGetUniformLocation(program_, "skinned");
     skin_palette_ = glGetUniformLocation(program_, "skin_palette[0]");
     has_weight_ = glGetUniformLocation(program_, "has_weight");
@@ -150,7 +154,7 @@ bool Cube::create(std::string& error) {
     glCullFace(GL_BACK);
     if (glGetError() != GL_NO_ERROR || transform_ < 0 || tint_ < 0 || image < 0 ||
         rotation_ < 0 || mesh_mode_ < 0 || centre_uniform_ < 0 || scale_uniform_ < 0 ||
-        skinned_ < 0 || skin_palette_ < 0 || has_weight_ < 0 ||
+        skinned_ < 0 || skin_palette_ < 0 || has_weight_ < 0 || instance_transform_ < 0 ||
         !array_ || !vertices_ || !indices_ || !texture_) {
         error = "Cannot initialise cube buffers, texture or uniforms";
         destroy();
@@ -262,6 +266,7 @@ bool Cube::set_skinned_model(const assets::SkinnedModel& model, std::string& err
         if (draw.indices) glDeleteBuffers(1, &draw.indices);
     }
     skin_draws_ = std::move(replacement);
+    skin_model_ = model;
     centre_ = {(lower[0]+upper[0])*.5f, (lower[1]+upper[1])*.5f, (lower[2]+upper[2])*.5f};
     double radius = 0;
     for (const auto& packet : model.packets) {
@@ -408,6 +413,8 @@ void Cube::draw(int width, int height, int colour, float angle, const camera::Vi
     glUseProgram(program_);
     const auto transform = view.transform(angle, float(width) / float(height), mesh_ ? 1.f : std::sqrt(3.f));
     glUniformMatrix4fv(transform_, 1, GL_FALSE, transform.data());
+    constexpr std::array<float, 16> identity = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    glUniformMatrix4fv(instance_transform_, 1, GL_FALSE, identity.data());
     const auto rotation = cube_data::rotation(angle);
     glUniformMatrix4fv(rotation_, 1, GL_FALSE, rotation.data());
     glUniform1i(mesh_mode_, mesh_);
@@ -419,7 +426,7 @@ void Cube::draw(int width, int height, int colour, float angle, const camera::Vi
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture_);
     if (!skin_draws_.empty()) {
-        constexpr std::array<float, 32 * 16> identity = [] {
+        constexpr std::array<float, 32 * 16> identity_palette = [] {
             std::array<float, 32 * 16> matrices{};
             for (std::size_t m = 0; m < 32; ++m)
                 for (std::size_t i = 0; i < 4; ++i) matrices[m * 16 + i * 5] = 1.f;
@@ -432,7 +439,7 @@ void Cube::draw(int width, int height, int colour, float angle, const camera::Vi
         for (const auto& packet : skin_draws_) {
             glUniform1i(has_weight_, packet.has_weight ? GL_TRUE : GL_FALSE);
             glUniformMatrix4fv(skin_palette_, static_cast<GLsizei>(packet.palette.size()), GL_FALSE,
-                               identity.data());
+                               identity_palette.data());
             glBindVertexArray(packet.array);
             glDrawElements(GL_TRIANGLES, packet.index_count, GL_UNSIGNED_SHORT, nullptr);
         }
@@ -443,6 +450,58 @@ void Cube::draw(int width, int height, int colour, float angle, const camera::Vi
         glBindVertexArray(array_);
         glDrawElements(GL_TRIANGLES, index_count_, GL_UNSIGNED_SHORT, nullptr);
     }
+    glBindVertexArray(0);
+}
+
+void Cube::draw_skinned_instances(int width, int height, float angle,
+                                  const camera::View& view,
+                                  const std::vector<skinning::Instance>& instances) {
+    if (width <= 0 || height <= 0 || skin_draws_.empty() || instances.empty()) return;
+    glViewport(0, 0, width, height);
+    glClearColor(0.035f, 0.05f, 0.075f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glUseProgram(program_);
+    float scene_radius = 1.f;
+    for (const auto& instance : instances) {
+        const float x = instance.transform[12], y = instance.transform[13], z = instance.transform[14];
+        scene_radius = std::max(scene_radius, 1.f + std::sqrt(x*x + y*y + z*z));
+    }
+    const auto transform = view.transform(angle, float(width) / float(height), scene_radius);
+    glUniformMatrix4fv(transform_, 1, GL_FALSE, transform.data());
+    const auto rotation = cube_data::rotation(angle);
+    glUniformMatrix4fv(rotation_, 1, GL_FALSE, rotation.data());
+    glUniform1i(mesh_mode_, GL_TRUE);
+    glUniform1i(skinned_, GL_TRUE);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture_);
+    glDisable(GL_CULL_FACE);
+    for (const auto& instance : instances) {
+        const auto fit = skinning::bounds(skin_model_, instance.bones);
+        glUniform3f(centre_uniform_, fit.centre.x, fit.centre.y, fit.centre.z);
+        glUniform1f(scale_uniform_, 1.f / fit.radius);
+        glUniformMatrix4fv(instance_transform_, 1, GL_FALSE, instance.transform.data());
+        for (std::size_t i = 0; i < skin_draws_.size(); ++i) {
+            const auto& packet = skin_draws_[i];
+            const auto& source = skin_model_.packets[i];
+            std::array<skinning::Matrix, 32> local{};
+            for (std::size_t slot = 0; slot < source.palette.size(); ++slot) {
+                const auto bone = source.palette[slot];
+                if (bone >= instance.bones.size()) {
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Skin pose misses bone %u", bone);
+                    glEnable(GL_CULL_FACE);
+                    return;
+                }
+                local[slot] = instance.bones[bone];
+            }
+            glUniform1i(has_weight_, packet.has_weight ? GL_TRUE : GL_FALSE);
+            glUniformMatrix4fv(skin_palette_, static_cast<GLsizei>(source.palette.size()), GL_FALSE,
+                               local.front().data());
+            glBindVertexArray(packet.array);
+            glDrawElements(GL_TRIANGLES, packet.index_count, GL_UNSIGNED_SHORT, nullptr);
+        }
+    }
+    glEnable(GL_CULL_FACE);
+    glUniform1i(skinned_, GL_FALSE);
     glBindVertexArray(0);
 }
 

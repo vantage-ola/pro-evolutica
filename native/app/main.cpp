@@ -19,6 +19,7 @@
 #include <fstream>
 #include <iomanip>
 #include <cstdio>
+#include <cstring>
 #include <sstream>
 #include <sys/stat.h>
 
@@ -28,6 +29,7 @@ struct App {
     SDL_GLContext context = nullptr;
     SDL_Gamepad* gamepad = nullptr;
     Cube cube;
+    std::vector<skinning::Instance> skinned_instances;
     std::unique_ptr<animation::Clip> clip;
     std::unique_ptr<animation::Playback> playback;
     std::size_t uploaded_sample = 0;
@@ -299,6 +301,32 @@ bool load_skinned_model(App& app) {
             SDL_Log("Player texture: no player.png; using white fallback");
         }
         if (!app.cube.set_texture(image, error)) throw std::runtime_error(error);
+        const std::string pose_path = std::string(directory) + "/player.pose";
+        std::ifstream pose_input(pose_path, std::ios::binary);
+        if (pose_input) {
+            std::vector<std::uint8_t> pose((std::istreambuf_iterator<char>(pose_input)), {});
+            if (pose.size() != 16 + model.bones.size() * 16 * sizeof(float) ||
+                std::memcmp(pose.data(), "PESPOSE1", 8))
+                throw std::runtime_error("player.pose header/size does not match player.ktmdl");
+            const auto read_u32 = [&pose](std::size_t offset) {
+                return std::uint32_t(pose[offset]) | (std::uint32_t(pose[offset+1]) << 8) |
+                    (std::uint32_t(pose[offset+2]) << 16) | (std::uint32_t(pose[offset+3]) << 24);
+            };
+            if (read_u32(8) != model.bones.size())
+                throw std::runtime_error("player.pose skeleton count differs from player.ktmdl");
+            skinning::Instance first;
+            first.bones.resize(model.bones.size());
+            std::memcpy(first.bones.data(), pose.data() + 16, first.bones.size() * sizeof(skinning::Matrix));
+            for (const auto& matrix : first.bones)
+                for (const auto value : matrix)
+                    if (!std::isfinite(value)) throw std::runtime_error("player.pose has non-finite matrix data");
+            skinning::Instance second = first;
+            first.transform[12] = -.52f;
+            second.transform[12] = .52f;
+            app.skinned_instances = {std::move(first), std::move(second)};
+            SDL_Log("Captured player pose loaded: %u skeleton bones; trace call=%u; drawing two shared-mesh instances",
+                    read_u32(8), read_u32(12));
+        }
         app.mesh_read_ms = double(upload_begin - read_begin) / 1e6;
         app.mesh_upload_ms = double(SDL_GetTicksNS() - upload_begin) / 1e6;
         app.mesh_loaded = true;
@@ -315,8 +343,9 @@ bool load_skinned_model(App& app) {
                     texture.mode, texture.uv_channel);
         }
         app.angle = 0;
-        SDL_Log("Skinned player loaded: %zu bones; %zu packet vertices; %zu triangles; bind pose (no PES animation yet)",
-            model.bones.size(), app.mesh_vertices, app.mesh_triangles);
+        SDL_Log("Skinned player loaded: %zu bones; %zu packet vertices; %zu triangles; %s",
+            model.bones.size(), app.mesh_vertices, app.mesh_triangles,
+            app.skinned_instances.empty() ? "bind pose" : "captured PES draw pose");
         return true;
     } catch (const std::exception& error) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Player model: %s; trying other scene", error.what());
@@ -519,7 +548,11 @@ bool create(App& app) {
         SDL_SetError("%s", error.c_str());
         return false;
     }
-    if (!load_animation(app) && !load_skinned_model(app)) {
+    const char* storage = SDL_GetAndroidInternalStoragePath();
+    const bool has_captured_pose = storage &&
+        std::ifstream(std::string(storage) + "/player.pose", std::ios::binary).good();
+    if (!(has_captured_pose && load_skinned_model(app)) &&
+        !load_animation(app) && !load_skinned_model(app)) {
         if (!app.running) return false;
         load_mesh(app);
         load_texture(app);
@@ -696,7 +729,10 @@ int main(int, char**) {
         if (!app.clip && !app.paused) app.angle = std::fmod(app.angle + elapsed * .65f, 6.28318530718f);
         const bool measuring = app.capture.active();
         const auto submit_begin = measuring ? SDL_GetTicksNS() : 0;
-        app.cube.draw(width, height, app.colour, app.angle, app.view);
+        if (app.skinned_instances.empty())
+            app.cube.draw(width, height, app.colour, app.angle, app.view);
+        else
+            app.cube.draw_skinned_instances(width, height, app.angle, app.view, app.skinned_instances);
         const GLenum error = glGetError();
         const auto swap_begin = measuring ? SDL_GetTicksNS() : 0;
         if (error != GL_NO_ERROR || !SDL_GL_SwapWindow(app.window)) {
