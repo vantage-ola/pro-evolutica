@@ -41,6 +41,13 @@ void launch_ball(BallFlightState& ball, std::uint16_t heading,
 
 void step_ball_flight_horizontal(BallFlightState& ball, BallFlightTick tick);
 
+// Applies the verified state-2 heading, curve, and horizontal-position update.
+// PES's final damped speed calculation still depends on an unresolved input,
+// so the caller must supply the speed observed/recovered for this tick. The
+// state-2 vertical-position change is deliberately left untouched.
+void step_ball_ground_motion(BallFlightState& ball, BallFlightTick tick,
+                             std::int32_t final_speed);
+
 // Applies only the pre-contact vertical position equation from
 // FUN_00e1e3e0's state-1 branch. The temporary-state velocity is measured in
 // 1/2560 world-unit increments per tick. Landing, bounce, and vertical-speed

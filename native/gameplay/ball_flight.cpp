@@ -130,6 +130,28 @@ void step_ball_flight_horizontal(BallFlightState& ball, BallFlightTick tick) {
     ball.z = add_internal_displacement(ball.z, dz);
 }
 
+void step_ball_ground_motion(BallFlightState& ball, BallFlightTick tick,
+                             std::int32_t final_speed) {
+    const std::int32_t jitter_source = position_integer(ball.x) +
+        (position_integer(ball.z) - position_integer(ball.y));
+    const std::int32_t remainder = jitter_source % 9;
+    const std::int32_t jitter = 4 - (remainder < 0 ? -remainder : remainder);
+    ball.angle = static_cast<std::uint16_t>(ball.angle + jitter);
+
+    const auto movement_speed = ball.speed +
+        divide_toward_zero((ball.curve - ball.speed) * 12, 100);
+    const auto curve = divide_toward_zero(tick.delta * movement_speed + ball.curve * 40, 40);
+    ball.curve = std::min(curve, final_speed);
+
+    const auto x_angle = static_cast<std::uint16_t>(ball.angle + 0xc000);
+    const std::int32_t dx = displacement(x_angle, movement_speed, tick.delta);
+    const std::int32_t dz = displacement(ball.angle, movement_speed, tick.delta);
+    ball.x = add_internal_displacement(ball.x, dx);
+    ball.z = add_internal_displacement(ball.z, dz);
+    ball.spin = 0;
+    ball.speed = final_speed;
+}
+
 void step_ball_flight_vertical_position(BallFlightState& ball, BallFlightTick tick) {
     constexpr double kVerticalPositionScale = 2560.0;
     const double scaled_position = static_cast<double>(ball.y) * kVerticalPositionScale;

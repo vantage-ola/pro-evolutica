@@ -113,6 +113,40 @@ void captured_vertical_position_steps() {
               "Recovered airborne Y step missed a captured position delta");
     }
 }
+
+void captured_ground_motion_steps() {
+    struct Case {
+        gameplay::BallFlightState input;
+        std::int32_t final_speed;
+        float expected_x;
+        float expected_y;
+        float expected_z;
+        std::uint16_t expected_angle;
+        std::int32_t expected_curve;
+    };
+    constexpr Case cases[] = {
+        {{-7991.890625f, -28.0f, -1799.857421875f, 14820, 511, 7569, 0,
+          0, 5062, 2},
+         7215, -7987.6484375f, -28.0f, -1827.923828125f, 14818, 6879},
+        {{-12308.62109375f, -28.0f, -674.1015625f, 40038, 540, 7000, 1,
+          0, 4680, 2},
+         6674, -12328.75f, -28.0f, -657.25f, 40039, 6360},
+        {{17425.46875f, -28.0f, 2384.40234375f, 61332, 576, 6971, 0,
+          0, 4660, 2},
+         6646, 17449.515625f, -28.0f, 2394.640625f, 61335, 6333},
+    };
+    for (const auto& test : cases) {
+        auto ball = test.input;
+        gameplay::step_ball_ground_motion(ball, {10}, test.final_speed);
+        check(ball.angle == test.expected_angle && ball.curve == test.expected_curve,
+              "PES ground step missed the captured heading or capped curve");
+        check(std::abs(ball.x - test.expected_x) < 0.0001f &&
+              std::abs(ball.z - test.expected_z) < 0.0001f,
+              "PES ground step missed a captured horizontal position");
+        check(ball.y == test.expected_y && ball.speed == test.final_speed && ball.spin == 0,
+              "Ground step must preserve unresolved Y while applying captured speed/spin");
+    }
+}
 }  // namespace
 
 int main() {
@@ -120,7 +154,8 @@ int main() {
         captured_state1_steps();
         original_kick_launch_fields();
         captured_vertical_position_steps();
-        std::cout << checks << " PES ball checks passed across three runtime snapshots and kick setup cases\n";
+        captured_ground_motion_steps();
+        std::cout << checks << " PES ball checks passed across captured airborne and ground steps\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
